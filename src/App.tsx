@@ -181,7 +181,6 @@ export function App() {
             <h1>{program.displayName ?? "RuleSpec program"}</h1>
             <div className="program-path">{program.path}</div>
           </div>
-          <div className="structure-badge">Structure only</div>
         </header>
 
         {selectedOutputs.length > 0 && (

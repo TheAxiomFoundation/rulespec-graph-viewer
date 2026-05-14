@@ -226,19 +226,6 @@ textarea {
   overflow-wrap: anywhere;
 }
 
-.structure-badge {
-  flex: 0 0 auto;
-  border: 1px solid #8b431f;
-  border-radius: 999px;
-  background: #fff7ef;
-  color: #8b431f;
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  padding: 9px 12px;
-  text-transform: uppercase;
-}
-
 .selected-output-strip {
   display: flex;
   flex-wrap: wrap;
