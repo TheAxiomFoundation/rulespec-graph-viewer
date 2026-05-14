@@ -37,10 +37,6 @@ interface Props {
   onExposeInput?: (legalId: string) => void;
   /** Builder feedback: which inputs are already user-driven. */
   exposedInputIds?: Set<string>;
-  /** Builder hook to toggle whether a rule is a dashboard output.
-   *  Click on a rule that's already an output demotes it; click on one
-   *  that isn't promotes it. */
-  onAddOutput?: (legalId: string) => void;
   /** Builder feedback: which rules are already exposed as outputs. */
   selectedOutputIds?: Set<string>;
   /** When true, show evaluated values + verdict colors. False = pure structure. */
@@ -74,7 +70,6 @@ export function InteractiveRuleGraph({
   traces,
   onExposeInput,
   exposedInputIds,
-  onAddOutput,
   selectedOutputIds,
   showValues = false,
   parameterRules,
@@ -154,7 +149,6 @@ export function InteractiveRuleGraph({
   const expandAll = useCallback(() => setCollapsed(new Set()), []);
 
   const canExposeInputs = !!onExposeInput;
-  const canToggleOutputs = !!onAddOutput;
   const { nodes, edges } = useMemo(
     () =>
       buildGraph(
@@ -167,7 +161,6 @@ export function InteractiveRuleGraph({
         canExposeInputs,
         parameterRules,
         selectedOutputIds,
-        canToggleOutputs,
       ),
     [
       spec,
@@ -179,7 +172,6 @@ export function InteractiveRuleGraph({
       canExposeInputs,
       parameterRules,
       selectedOutputIds,
-      canToggleOutputs,
       // Re-build (and therefore re-measure label heights) when fonts load.
       fontsReady,
     ],
@@ -328,20 +320,12 @@ export function InteractiveRuleGraph({
               return;
             }
             if (data.kind === "ruleRef") {
-              if (action === "output" && onAddOutput) {
-                onAddOutput(data.legalId);
-                return;
-              }
               if (action === "collapse" && data.canExpand) {
                 toggleCollapse(data.legalId);
                 return;
               }
             }
             if (data.kind === "output") {
-              if (action === "output" && onAddOutput) {
-                onAddOutput(data.legalId);
-                return;
-              }
               if (action === "collapse" && data.canExpand) {
                 toggleCollapse(data.legalId);
                 return;
@@ -464,10 +448,6 @@ type IrgNodeData =
       value: string;
       showValues: boolean;
       meta: NodeMeta;
-      /** True when the parent passed onAddOutput — enables the "− output"
-       *  affordance so the user can demote the binding from inside the
-       *  graph (matters for outputs that were promoted up from rules). */
-      canToggleOutput: boolean;
       /** True when the underlying trace has a formula whose upstream
        *  chain we can collapse. */
       canExpand: boolean;
@@ -504,9 +484,6 @@ type IrgNodeData =
       label: string;
       legalId: string;
       canExpand: boolean;
-      /** True when the parent passed onAddOutput — enables the
-       *  "+ OUTPUT" / "− OUTPUT" affordance on rule nodes. */
-      canToggleOutput: boolean;
       /** Whether the rule is currently selected as a dashboard output. */
       isOutput: boolean;
       verdictCls: string;
@@ -739,11 +716,6 @@ const OutputNode = ({ data }: NodeProps) => {
       <div className="irg-eyebrow">Result</div>
       <div className="irg-label">{softBreak(humanizeLabel(d.label))}</div>
       {d.showValues && d.value && <div className="irg-value">{d.value}</div>}
-      {d.canToggleOutput && (
-        <div className="irg-action irg-action-clickable" data-action="output">
-          − remove from results
-        </div>
-      )}
       {d.canExpand && (
         <div
           className="irg-action irg-action-secondary irg-action-clickable"
@@ -839,14 +811,6 @@ const RuleRefNode = ({ data }: NodeProps) => {
       <div className="irg-eyebrow">{d.isOutput ? "Step · result" : "Step"}</div>
       <div className="irg-label">{softBreak(humanizeLabel(d.label))}</div>
       {d.showValues && d.value && <div className="irg-value">{d.value}</div>}
-      {d.canToggleOutput && (
-        <div
-          className="irg-action irg-action-clickable"
-          data-action="output"
-        >
-          {d.isOutput ? "− remove from results" : "+ make a result"}
-        </div>
-      )}
       {d.canExpand && (
         <div
           className="irg-action irg-action-secondary irg-action-clickable"
@@ -944,7 +908,6 @@ function buildGraph(
   canExposeInputs: boolean = false,
   parameterRules?: ParameterRule[],
   selectedOutputIds?: Set<string>,
-  canToggleOutputs: boolean = false,
 ): BuildResult {
   // Index parameter rules by bare name so the formula walker can resolve
   // identifiers that aren't in the trace (parameters get inlined as
@@ -1000,7 +963,6 @@ function buildGraph(
           value: showValues ? formatValue(outputTrace.value) : "",
           showValues,
           meta: buildMeta(outputTrace, "Output"),
-          canToggleOutput: canToggleOutputs,
           canExpand,
           isExpanded,
         } satisfies IrgNodeData,
@@ -1031,7 +993,6 @@ function buildGraph(
           showValues,
           parametersByName,
           selectedOutputIds,
-          canToggleOutputs,
           outputNodeIdByLegalId,
         },
       );
@@ -1169,10 +1130,8 @@ interface WalkCtx {
    *  references a parameter the engine inlined as a constant. */
   parametersByName: Map<string, ParameterRule>;
   /** Rule legal IDs already exposed as dashboard outputs — drives the
-   *  "− OUTPUT" affordance on rule nodes. */
+   *  result styling on rule nodes. */
   selectedOutputIds: Set<string> | undefined;
-  /** True when the parent passed an onAddOutput callback (Step II). */
-  canToggleOutputs: boolean;
   /** legalId → existing OUTPUT node id. When the formula walker resolves
    *  a sub-rule whose legalId is already an output binding, we reuse
    *  the OUTPUT node instead of creating a parallel ruleRef. */
@@ -1265,7 +1224,6 @@ function walkAst(node: AstNode, parentScope: string, opPath: string, ctx: WalkCt
           label: t.label || node.name,
           legalId: t.legalId,
           canExpand: Boolean(t.formula),
-          canToggleOutput: ctx.canToggleOutputs,
           isOutput,
           verdictCls: verdictClass(t),
           value: ctx.showValues ? formatValue(t.value) : "",
@@ -1651,12 +1609,10 @@ function labelledNodeSize(
   } else if (data.kind === "input") {
     chrome = 78; // padding + eyebrow + + EXPOSE divider row
   } else if (data.kind === "output") {
-    const outputRows =
-      (data.canToggleOutput ? 1 : 0) + (data.canExpand ? 1 : 0);
+    const outputRows = data.canExpand ? 1 : 0;
     chrome = 50 + outputRows * 22;
   } else if (data.kind === "ruleRef") {
-    const actionRows =
-      (data.canToggleOutput ? 1 : 0) + (data.canExpand ? 1 : 0);
+    const actionRows = data.canExpand ? 1 : 0;
     chrome = 50 + actionRows * 22;
   } else {
     chrome = 56;

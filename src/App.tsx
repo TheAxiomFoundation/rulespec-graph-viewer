@@ -246,7 +246,6 @@ export function App() {
             showValues={false}
             parameterRules={parameterRules}
             selectedOutputIds={selectedSet}
-            onAddOutput={toggleOutput}
           />
         ) : (
           <div className="empty-state">Select at least one output to render its computation graph.</div>
