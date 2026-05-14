@@ -28,10 +28,10 @@ export function App() {
     setProgramsLoading(true);
     fetchRepos(computeUrl)
       .then((repos) => Promise.all(repos.map((repo) => fetchPrograms(computeUrl, repo))))
-      .then((lists) => {
+      .then((lists) => filterProgramsWithCalculationStructure(computeUrl, lists.flat()))
+      .then((visualizablePrograms) => {
         if (cancelled) return;
-        const nextPrograms = lists.flat().filter((item) => item.kind === "policies");
-        setPrograms(nextPrograms);
+        setPrograms(visualizablePrograms);
       })
       .catch((err) => {
         if (!cancelled) setError(String(err));
@@ -299,7 +299,7 @@ function rankOutputRules(graph: ProgramGraph | null): RuleNode[] {
   if (!graph) return [];
   const terminal = new Set(graph.terminalOutputs);
   return graph.rules
-    .filter((rule) => rule.kind === "derived")
+    .filter(isGraphableOutputRule)
     .map((rule) => ({
       rule,
       score:
@@ -310,6 +310,44 @@ function rankOutputRules(graph: ProgramGraph | null): RuleNode[] {
     .sort((a, b) => b.score - a.score || a.rule.name.localeCompare(b.rule.name))
     .slice(0, 40)
     .map(({ rule }) => rule);
+}
+
+function isGraphableOutputRule(rule: RuleNode): boolean {
+  if (rule.kind !== "derived") return false;
+  if (!rule.formula?.trim()) return false;
+  return (
+    rule.ruleDeps.length > 0 ||
+    rule.inputDeps.length > 0 ||
+    rule.relationDeps.length > 0
+  );
+}
+
+async function filterProgramsWithCalculationStructure(
+  computeUrl: string,
+  candidates: ProgramSummary[],
+): Promise<ProgramSummary[]> {
+  const policies = candidates.filter((item) => item.kind === "policies");
+  const visualizable: ProgramSummary[] = [];
+  let cursor = 0;
+
+  async function worker() {
+    while (cursor < policies.length) {
+      const item = policies[cursor++];
+      try {
+        const graph = await fetchProgramGraph(computeUrl, {
+          repo: item.repo,
+          path: item.path,
+          displayName: displayNameForProgram(item),
+        });
+        if (rankOutputRules(graph).length > 0) visualizable.push(item);
+      } catch {
+        // Skip programs whose graph cannot be loaded from the current compute service.
+      }
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.min(8, policies.length) }, worker));
+  return visualizable.sort((a, b) => displayNameForProgram(a).localeCompare(displayNameForProgram(b)));
 }
 
 function labelForRule(graph: ProgramGraph | null, legalId: LegalId): string {
