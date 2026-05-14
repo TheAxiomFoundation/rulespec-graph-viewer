@@ -1,0 +1,28 @@
+{
+  "name": "rulespec-graph-viewer",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Standalone RuleSpec computation graph viewer for Axiom rule programs.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview --port 5178",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@xyflow/react": "^12.10.2",
+    "dagre": "^0.8.5",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/dagre": "^0.7.54",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11"
+  },
+  "packageManager": "pnpm@9.0.0"
+}
