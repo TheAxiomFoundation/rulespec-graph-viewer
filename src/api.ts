@@ -1,4 +1,10 @@
-import type { ComputeResponse, LegalId, ProgramGraph, ProgramRef } from "./types";
+import type {
+  ComputeResponse,
+  LegalId,
+  ProgramGraph,
+  ProgramRef,
+  ProgramSummary,
+} from "./types";
 
 export const DEFAULT_COMPUTE_URL =
   import.meta.env.VITE_COMPUTE_URL ?? "https://policyengine--dashboard-builder-compute.modal.run";
@@ -13,6 +19,27 @@ export const DEFAULT_OUTPUTS = [
   "us-co:policies/cdhs/snap/fy-2026-benefit-calculation#snap_eligible",
   "us-co:regulations/10-ccr-2506-1/4.207.2#snap_allotment",
 ];
+
+export async function fetchRepos(computeUrl: string): Promise<string[]> {
+  const response = await fetch(`${trimSlash(computeUrl)}/repos`);
+  if (!response.ok) {
+    throw new Error(`repos request failed (${response.status}): ${await response.text()}`);
+  }
+  const json = (await response.json()) as { repos?: string[] };
+  return json.repos ?? [];
+}
+
+export async function fetchPrograms(
+  computeUrl: string,
+  repo: string,
+): Promise<ProgramSummary[]> {
+  const response = await fetch(`${trimSlash(computeUrl)}/repos/${encodeURIComponent(repo)}/programs`);
+  if (!response.ok) {
+    throw new Error(`programs request failed (${response.status}): ${await response.text()}`);
+  }
+  const json = (await response.json()) as { programs?: ProgramSummary[] };
+  return json.programs ?? [];
+}
 
 export async function fetchProgramGraph(
   computeUrl: string,

@@ -5,18 +5,43 @@ import {
   DEFAULT_OUTPUTS,
   DEFAULT_PROGRAM,
   computeTrace,
+  fetchPrograms,
   fetchProgramGraph,
+  fetchRepos,
 } from "./api";
-import type { ComputeResponse, DashboardSpec, LegalId, ParameterRule, ProgramGraph, ProgramRef, RuleNode } from "./types";
+import type { ComputeResponse, DashboardSpec, LegalId, ParameterRule, ProgramGraph, ProgramRef, ProgramSummary, RuleNode } from "./types";
 
 export function App() {
-  const [computeUrl, setComputeUrl] = useState(DEFAULT_COMPUTE_URL);
+  const computeUrl = DEFAULT_COMPUTE_URL;
   const [program, setProgram] = useState<ProgramRef>(DEFAULT_PROGRAM);
+  const [programs, setPrograms] = useState<ProgramSummary[]>([]);
   const [graph, setGraph] = useState<ProgramGraph | null>(null);
   const [selectedOutputs, setSelectedOutputs] = useState<LegalId[]>(DEFAULT_OUTPUTS);
   const [result, setResult] = useState<ComputeResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [programsLoading, setProgramsLoading] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setProgramsLoading(true);
+    fetchRepos(computeUrl)
+      .then((repos) => Promise.all(repos.map((repo) => fetchPrograms(computeUrl, repo))))
+      .then((lists) => {
+        if (cancelled) return;
+        const nextPrograms = lists.flat().filter((item) => item.kind === "policies");
+        setPrograms(nextPrograms);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(String(err));
+      })
+      .finally(() => {
+        if (!cancelled) setProgramsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [computeUrl]);
 
   useEffect(() => {
     let cancelled = false;
@@ -107,12 +132,17 @@ export function App() {
     );
   }
 
-  function loadProgram() {
+  function selectProgram(value: string) {
+    const next = programs.find((item) => `${item.repo}/${item.path}` === value);
+    if (!next) return;
     setProgram({
-      repo: program.repo.trim(),
-      path: program.path.trim(),
-      displayName: program.displayName?.trim() || program.path.trim(),
+      repo: next.repo,
+      path: next.path,
+      displayName: displayNameForProgram(next),
     });
+    setGraph(null);
+    setResult(null);
+    setSelectedOutputs([]);
   }
 
   return (
@@ -127,30 +157,33 @@ export function App() {
         <section className="control-block program-controls">
           <div className="section-head stacked">
             <h2>Program</h2>
-            <span>{graph ? `${graph.rules.length} rules loaded` : "Not loaded"}</span>
+            <span>
+              {programsLoading
+                ? "Loading programs"
+                : graph
+                  ? `${graph.rules.length} rules loaded`
+                  : "Loading graph"}
+            </span>
           </div>
           <label>
-            Compute URL
-            <input value={computeUrl} onChange={(event) => setComputeUrl(event.target.value)} />
+            Select program
+            <select
+              value={`${program.repo}/${program.path}`}
+              onChange={(event) => selectProgram(event.target.value)}
+            >
+              {programs.length === 0 && (
+                <option value={`${program.repo}/${program.path}`}>
+                  {program.displayName ?? program.path}
+                </option>
+              )}
+              {programs.map((item) => (
+                <option key={`${item.repo}/${item.path}`} value={`${item.repo}/${item.path}`}>
+                  {displayNameForProgram(item)}
+                </option>
+              ))}
+            </select>
           </label>
-          <label>
-            Repo
-            <input
-              value={program.repo}
-              onChange={(event) => setProgram({ ...program, repo: event.target.value })}
-            />
-          </label>
-          <label>
-            Program path
-            <textarea
-              rows={3}
-              value={program.path}
-              onChange={(event) => setProgram({ ...program, path: event.target.value })}
-            />
-          </label>
-          <button type="button" className="primary-button" onClick={loadProgram}>
-            Load program
-          </button>
+          <p className="program-summary">{summaryForProgram(programs, program)}</p>
         </section>
 
         <section className="control-block">
@@ -252,6 +285,19 @@ function rankOutputRules(graph: ProgramGraph | null): RuleNode[] {
 function labelForRule(graph: ProgramGraph | null, legalId: LegalId): string {
   const rule = graph?.rules.find((candidate) => candidate.legalId === legalId);
   return humanize(rule?.name ?? legalId.split("#").pop() ?? legalId);
+}
+
+function displayNameForProgram(program: ProgramSummary): string {
+  if (program.repo === DEFAULT_PROGRAM.repo && program.path === DEFAULT_PROGRAM.path) {
+    return DEFAULT_PROGRAM.displayName ?? program.name;
+  }
+  const fallback = program.path.replace(/\.yaml$/, "").split("/").pop() ?? program.path;
+  return humanize(program.name || fallback);
+}
+
+function summaryForProgram(programs: ProgramSummary[], program: ProgramRef): string {
+  const match = programs.find((item) => item.repo === program.repo && item.path === program.path);
+  return match?.summary ?? program.path;
 }
 
 function humanize(value: string): string {

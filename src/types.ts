@@ -6,6 +6,14 @@ export interface ProgramRef {
   displayName?: string;
 }
 
+export interface ProgramSummary {
+  repo: string;
+  path: string;
+  kind: string;
+  name: string;
+  summary?: string;
+}
+
 export interface PeriodRef {
   kind: "month";
   start: string;
