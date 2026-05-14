@@ -151,6 +151,14 @@ textarea {
   font-size: 13px;
 }
 
+.output-search {
+  margin-top: -4px;
+}
+
+.output-search input {
+  padding-left: 12px;
+}
+
 .output-list {
   display: grid;
   gap: 8px;
@@ -189,6 +197,15 @@ textarea {
 
 .output-option small {
   color: #746d65;
+}
+
+.output-empty {
+  border: 1px dashed #d2c8bd;
+  border-radius: 6px;
+  color: #746d65;
+  font-size: 13px;
+  line-height: 1.45;
+  padding: 14px;
 }
 
 .viewer-panel {

@@ -21,6 +21,7 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   const [programsLoading, setProgramsLoading] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [outputSearch, setOutputSearch] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -89,6 +90,24 @@ export function App() {
   }, [computeUrl, program, selectedOutputs]);
 
   const outputRules = useMemo(() => rankOutputRules(graph), [graph]);
+  const filteredOutputRules = useMemo(() => {
+    const query = outputSearch.trim().toLowerCase();
+    if (!query) return outputRules;
+    return outputRules.filter((rule) => {
+      const haystack = [
+        rule.name,
+        humanize(rule.name),
+        rule.legalId,
+        rule.dtype,
+        rule.kind,
+        rule.source,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [outputRules, outputSearch]);
   const parameterRules = useMemo<ParameterRule[]>(
     () =>
       (graph?.rules ?? [])
@@ -191,8 +210,17 @@ export function App() {
             <h2>Outputs</h2>
             <span>{selectedOutputs.length} selected</span>
           </div>
+          <label className="output-search">
+            Search outputs
+            <input
+              type="search"
+              value={outputSearch}
+              onChange={(event) => setOutputSearch(event.target.value)}
+              placeholder="Eligibility, allotment, income..."
+            />
+          </label>
           <div className="output-list">
-            {outputRules.map((rule) => (
+            {filteredOutputRules.map((rule) => (
               <button
                 type="button"
                 key={rule.legalId}
@@ -203,6 +231,9 @@ export function App() {
                 <small>{rule.dtype ?? rule.kind ?? "rule"}</small>
               </button>
             ))}
+            {filteredOutputRules.length === 0 && (
+              <div className="output-empty">No outputs match this search.</div>
+            )}
           </div>
         </section>
       </aside>
