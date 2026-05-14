@@ -15,7 +15,6 @@ export function App() {
   const [graph, setGraph] = useState<ProgramGraph | null>(null);
   const [selectedOutputs, setSelectedOutputs] = useState<LegalId[]>(DEFAULT_OUTPUTS);
   const [result, setResult] = useState<ComputeResponse | null>(null);
-  const [showValues, setShowValues] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -121,10 +120,15 @@ export function App() {
       <aside className="side-panel">
         <div className="brand">
           <span>Axiom</span>
-          <strong>Rule graph viewer</strong>
+          <strong>Rule Graph</strong>
+          <p>Explore the structure of a RuleSpec computation without the dashboard builder workflow.</p>
         </div>
 
-        <section className="control-block">
+        <section className="control-block program-controls">
+          <div className="section-head stacked">
+            <h2>Program</h2>
+            <span>{graph ? `${graph.rules.length} rules loaded` : "Not loaded"}</span>
+          </div>
           <label>
             Compute URL
             <input value={computeUrl} onChange={(event) => setComputeUrl(event.target.value)} />
@@ -174,18 +178,26 @@ export function App() {
         <header className="viewer-header">
           <div>
             <p>{program.repo}</p>
-            <h1>{program.displayName ?? program.path}</h1>
+            <h1>{program.displayName ?? "RuleSpec program"}</h1>
+            <div className="program-path">{program.path}</div>
           </div>
-          <div className="header-actions">
-            <button
-              type="button"
-              className={`toggle-button ${showValues ? "is-selected" : ""}`}
-              onClick={() => setShowValues((value) => !value)}
-            >
-              {showValues ? "Values on" : "Structure only"}
-            </button>
-          </div>
+          <div className="structure-badge">Structure only</div>
         </header>
+
+        {selectedOutputs.length > 0 && (
+          <div className="selected-output-strip" aria-label="Selected outputs">
+            {selectedOutputs.map((legalId) => (
+              <button
+                key={legalId}
+                type="button"
+                onClick={() => toggleOutput(legalId)}
+                title="Remove output from graph"
+              >
+                {labelForRule(graph, legalId)}
+              </button>
+            ))}
+          </div>
+        )}
 
         {loading && <div className="status">Loading graph…</div>}
         {error && <div className="status error">{error}</div>}
@@ -199,7 +211,7 @@ export function App() {
           <InteractiveRuleGraph
             spec={spec}
             traces={result.traces}
-            showValues={showValues}
+            showValues={false}
             parameterRules={parameterRules}
             selectedOutputIds={selectedSet}
             onAddOutput={toggleOutput}
