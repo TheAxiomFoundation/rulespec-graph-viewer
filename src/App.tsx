@@ -230,7 +230,6 @@ export function App() {
           <div>
             <p>{program.repo}</p>
             <h1>{program.displayName ?? "RuleSpec program"}</h1>
-            <div className="program-path">{program.path}</div>
           </div>
         </header>
 
@@ -297,6 +296,7 @@ function buildStructureTraces(
       const trace: TraceNode = {
         legalId: rule.legalId,
         label: rule.name,
+        ruleKind: rule.kind,
         value: null,
         dtype: traceDtype(rule.dtype),
         source: rule.source ?? undefined,

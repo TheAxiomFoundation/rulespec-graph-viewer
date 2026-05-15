@@ -40,6 +40,7 @@ export interface DashboardSpec {
 export interface TraceNode {
   legalId: LegalId;
   label?: string;
+  ruleKind?: string | null;
   value: number | string | boolean | null;
   dtype: "money" | "decimal" | "integer" | "boolean" | "date" | "judgment" | "string" | "input";
   source?: string;

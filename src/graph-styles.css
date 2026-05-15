@@ -3022,6 +3022,22 @@ body, html, #root {
   color: var(--color-ink-muted);
 }
 
+.irg-parameter {
+  background: #eef2ff;
+  border-color: #6366f1;
+  border-style: solid;
+  box-shadow: 0 10px 28px -24px rgba(67, 56, 202, 0.65);
+}
+
+.irg-parameter .irg-eyebrow {
+  color: #4338ca;
+}
+
+.irg-parameter .irg-label {
+  color: #312e81;
+  font-style: normal;
+}
+
 /* Edges — colors are also set inline (markerEnd needs colors at JSX time)
    but we override the stroke here so the path matches the marker. */
 

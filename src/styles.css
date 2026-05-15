@@ -241,16 +241,6 @@ textarea {
   margin: 0;
 }
 
-.program-path {
-  margin-top: 12px;
-  max-width: 920px;
-  color: #6d655d;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 13px;
-  line-height: 1.4;
-  overflow-wrap: anywhere;
-}
-
 .selected-output-strip {
   display: flex;
   flex-wrap: wrap;

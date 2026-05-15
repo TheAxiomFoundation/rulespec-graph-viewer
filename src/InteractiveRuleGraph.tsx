@@ -484,6 +484,7 @@ type IrgNodeData =
       label: string;
       legalId: string;
       canExpand: boolean;
+      isParameter: boolean;
       /** Whether the rule is currently selected as a dashboard output. */
       isOutput: boolean;
       verdictCls: string;
@@ -499,6 +500,7 @@ type IrgNodeData =
   | {
       kind: "unknown";
       label: string;
+      isParameter?: boolean;
       /** Set when the unknown identifier resolves to a parameter rule —
        *  enables the hover popover with citation/value/Axiom link. */
       meta?: NodeMeta;
@@ -804,11 +806,13 @@ const RuleRefNode = ({ data }: NodeProps) => {
   return (
     <div
       ref={ref}
-      className={`irg-node irg-rule ${d.showValues ? d.verdictCls : "irg-neutral"} ${d.canExpand ? "irg-can-expand" : ""} ${d.isOutput ? "irg-rule-output" : ""}`}
+      className={`irg-node irg-rule ${d.isParameter ? "irg-parameter" : ""} ${d.showValues ? d.verdictCls : "irg-neutral"} ${d.canExpand ? "irg-can-expand" : ""} ${d.isOutput ? "irg-rule-output" : ""}`}
     >
       <HandleBoth />
       <InfoBadge open={pop.open} onEnter={pop.enter} onLeave={pop.leave} />
-      <div className="irg-eyebrow">{d.isOutput ? "Step · result" : "Step"}</div>
+      <div className="irg-eyebrow">
+        {d.isParameter ? "Parameter" : d.isOutput ? "Step · result" : "Step"}
+      </div>
       <div className="irg-label">{softBreak(humanizeLabel(d.label))}</div>
       {d.showValues && d.value && <div className="irg-value">{d.value}</div>}
       {d.canExpand && (
@@ -846,12 +850,12 @@ const UnknownNode = ({ data }: NodeProps) => {
   const pop = useHoverPopover();
   const ref = useRef<HTMLDivElement>(null);
   return (
-    <div ref={ref} className="irg-node irg-unknown">
+    <div ref={ref} className={`irg-node irg-unknown ${d.isParameter ? "irg-parameter" : ""}`}>
       <HandleSource />
       {d.meta && (
         <InfoBadge open={pop.open} onEnter={pop.enter} onLeave={pop.leave} />
       )}
-      <div className="irg-eyebrow">Parameter</div>
+      <div className="irg-eyebrow">{d.isParameter ? "Parameter" : "Unresolved"}</div>
       <div className="irg-label">{softBreak(humanizeLabel(d.label))}</div>
       {d.meta && (
         <NodeInfo
@@ -882,6 +886,7 @@ function miniMapColor(d: IrgNodeData): string {
     case "output": return "#1c1917";
     case "input": return d.source === "user" ? "#166534" : "#b45309";
     case "ruleRef": return "#92400e";
+    case "unknown": return d.isParameter ? "#4338ca" : "#a8a29e";
     case "ifGate": return "#92400e";
     case "operator": return "#92400e";
     case "literal": return "#e7e5e4";
@@ -1017,9 +1022,10 @@ function buildGraph(
   const ctxExtras = { parametersByName };
   void ctxExtras;
 
-  // Wires-only mode: collapse every operator/IF/literal/unknown node so the
-  // graph shows only inputs, sub-rules, and outputs connected by direct
-  // wires. Each removed node's incoming and outgoing edges are merged.
+  // Wires-only mode: collapse every operator/IF/literal/non-parameter unknown
+  // node so the graph shows only inputs, parameters, sub-rules, and outputs
+  // connected by direct wires. Each removed node's incoming and outgoing
+  // edges are merged.
   if (detail === "wires") {
     const result = collapseOperators(nodes, edges);
     layout(result.nodes, result.edges);
@@ -1031,16 +1037,23 @@ function buildGraph(
 }
 
 /**
- * Remove operator/IF/literal/unknown boxes and merge their incoming &
- * outgoing edges into direct wires from sources to targets. Edge styling
- * inherited from the outgoing edge so verdict coloring (active branch,
+ * Remove operator/IF/literal/non-parameter unknown boxes and merge their
+ * incoming & outgoing edges into direct wires from sources to targets. Edge
+ * styling inherited from the outgoing edge so verdict coloring (active branch,
  * failing AND-clause, etc.) survives the collapse.
  */
 function collapseOperators(nodes: Node[], edges: Edge[]): BuildResult {
-  const passthroughKinds = new Set(["operator", "ifGate", "literal", "unknown"]);
   const passthroughIds = new Set(
     nodes
-      .filter((n) => passthroughKinds.has((n.data as IrgNodeData).kind))
+      .filter((n) => {
+        const data = n.data as IrgNodeData;
+        return (
+          data.kind === "operator" ||
+          data.kind === "ifGate" ||
+          data.kind === "literal" ||
+          (data.kind === "unknown" && !data.isParameter)
+        );
+      })
       .map((n) => n.id),
   );
 
@@ -1172,6 +1185,7 @@ function walkAst(node: AstNode, parentScope: string, opPath: string, ctx: WalkCt
           data: {
             kind: "unknown",
             label: node.name,
+            isParameter: Boolean(param),
             meta: param ? buildParameterMeta(param) : undefined,
           } satisfies IrgNodeData,
         });
@@ -1216,6 +1230,7 @@ function walkAst(node: AstNode, parentScope: string, opPath: string, ctx: WalkCt
       // its internals and click again to re-expand.
       const isExpanded = !ctx.collapsed.has(t.legalId);
       const ruleNodeKey = `rule:${t.legalId}`;
+      const isParameter = t.ruleKind === "parameter";
       const isOutput = ctx.selectedOutputIds?.has(t.legalId) ?? false;
       const ruleNodeId = ensureNode(ctx, ruleNodeKey, {
         type: "ruleRef",
@@ -1223,16 +1238,17 @@ function walkAst(node: AstNode, parentScope: string, opPath: string, ctx: WalkCt
           kind: "ruleRef",
           label: t.label || node.name,
           legalId: t.legalId,
-          canExpand: Boolean(t.formula),
+          canExpand: Boolean(t.formula) && !isParameter,
+          isParameter,
           isOutput,
           verdictCls: verdictClass(t),
           value: ctx.showValues ? formatValue(t.value) : "",
           isExpanded,
           showValues: ctx.showValues,
-          meta: buildMeta(t, "Rule"),
+          meta: buildMeta(t, isParameter ? "Parameter" : "Rule"),
         } satisfies IrgNodeData,
       });
-      if (isExpanded && t.formula) {
+      if (isExpanded && t.formula && !isParameter) {
         const inlineSource = walkExpr(t.formula, t.legalId, ctx);
         if (inlineSource) {
           // Connect the expanded sub-rule's AST to the rule node so the
@@ -1689,7 +1705,7 @@ function buildParameterMeta(p: ParameterRule): NodeMeta {
   };
 }
 
-function buildMeta(t: TraceNode, kind: "Output" | "Input" | "Rule"): NodeMeta {
+function buildMeta(t: TraceNode, kind: "Output" | "Input" | "Rule" | "Parameter"): NodeMeta {
   const fileLegalId = t.homeFile ?? fileLegalIdOf(t.legalId);
   const citation = t.source ?? (fileLegalId ? humanizeCitation(fileLegalId) : undefined);
   const appUrl = fileLegalId ? axiomAppUrl(fileLegalId) : null;
@@ -1698,12 +1714,22 @@ function buildMeta(t: TraceNode, kind: "Output" | "Input" | "Rule"): NodeMeta {
   // Rule → Step. Output stays Output since "result" is a layered
   // concept the user already sees as the eyebrow on the node body.
   const friendly =
-    kind === "Input" ? "Question" : kind === "Rule" ? "Step" : "Result";
+    kind === "Input"
+      ? "Question"
+      : kind === "Rule"
+        ? "Step"
+        : kind === "Parameter"
+          ? "Parameter"
+          : "Result";
   return {
     kindLine: `${friendly}${dtypeText}`,
     citation,
     legalId: t.legalId,
     appUrl,
+    formulaPreview:
+      kind === "Parameter" && t.formula
+        ? truncate(t.formula.replace(/\s+/g, " ").trim(), 140)
+        : undefined,
   };
 }
 
