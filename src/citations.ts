@@ -53,8 +53,26 @@ export function axiomAppUrl(fileLegalId: string): string | null {
   if (parts.length < 1) return null;
   const [kind, ...rest] = parts;
   const singular = KIND_SINGULAR[kind!] ?? kind!;
-  const path = [jurisdiction, singular, ...rest].join("/");
+  const appRest = normalizeAxiomAppSegments(jurisdiction, kind!, rest);
+  const path = [jurisdiction, singular, ...appRest].join("/");
   return `https://app.axiom-foundation.org/${path}`;
+}
+
+function normalizeAxiomAppSegments(
+  jurisdiction: string,
+  kind: string,
+  rest: string[],
+): string[] {
+  if (
+    jurisdiction === "us" &&
+    kind === "regulations" &&
+    rest.length > 0 &&
+    rest[0]?.endsWith("-cfr")
+  ) {
+    const [title, ...tail] = rest;
+    return [title.replace(/-cfr$/, ""), ...tail];
+  }
+  return rest;
 }
 
 /** A legalId for a rule or input is `<file>#rule.<name>` / `<file>#input.<name>`.
