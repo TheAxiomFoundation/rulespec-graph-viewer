@@ -252,21 +252,23 @@ export function App() {
           </div>
         )}
 
-        {error && <div className="status error">{error}</div>}
+        <div className="graph-stage">
+          {error && <div className="status error">{error}</div>}
 
-        {loading ? (
-          <div className="empty-state">Loading graph…</div>
-        ) : Object.keys(structureTraces).length > 0 ? (
-          <InteractiveRuleGraph
-            spec={spec}
-            traces={structureTraces}
-            showValues={false}
-            parameterRules={parameterRules}
-            selectedOutputIds={selectedSet}
-          />
-        ) : (
-          <div className="empty-state">Select at least one output to render its computation graph.</div>
-        )}
+          {loading ? (
+            <div className="empty-state">Loading graph…</div>
+          ) : Object.keys(structureTraces).length > 0 ? (
+            <InteractiveRuleGraph
+              spec={spec}
+              traces={structureTraces}
+              showValues={false}
+              parameterRules={parameterRules}
+              selectedOutputIds={selectedSet}
+            />
+          ) : (
+            <div className="empty-state">Select at least one output to render its computation graph.</div>
+          )}
+        </div>
       </section>
     </main>
   );
