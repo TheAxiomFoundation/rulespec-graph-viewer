@@ -92,16 +92,17 @@ export function InteractiveRuleGraph({
   // mathematical operator that means "the boxes it pertains to"; for an
   // intermediate variable that means the chain on both sides.
   const [highlightNodeId, setHighlightNodeId] = useState<string | null>(null);
-  // Bumps when web fonts finish loading so we re-run buildGraph (and
-  // therefore re-measure label heights) with the correct typeface
-  // metrics — the initial pass may have used a fallback while
-  // Geist Mono was still in flight.
-  const [fontsReady, setFontsReady] = useState(0);
+  // Wait for web fonts before the first visible graph render. Otherwise we
+  // measure labels with fallback metrics, render a layout, then rebuild and
+  // let React Flow fitView again when the final font arrives.
+  const [fontsReady, setFontsReady] = useState(
+    () => typeof document === "undefined" || !("fonts" in document),
+  );
   useEffect(() => {
     if (typeof document === "undefined" || !("fonts" in document)) return;
     let cancelled = false;
     void (document as Document).fonts.ready.then(() => {
-      if (!cancelled) setFontsReady((n) => n + 1);
+      if (!cancelled) setFontsReady(true);
     });
     return () => {
       cancelled = true;
@@ -172,7 +173,6 @@ export function InteractiveRuleGraph({
       canExposeInputs,
       parameterRules,
       selectedOutputIds,
-      // Re-build (and therefore re-measure label heights) when fonts load.
       fontsReady,
     ],
   );
@@ -283,6 +283,14 @@ export function InteractiveRuleGraph({
       };
     });
   }, [edges, highlightSet]);
+
+  if (!fontsReady) {
+    return (
+      <div ref={wrapRef} className="irg-wrap">
+        <div className="irg-loading">Preparing graph…</div>
+      </div>
+    );
+  }
 
   return (
     <div ref={wrapRef} className={`irg-wrap ${isFullscreen ? "irg-fullscreen" : ""}`}>

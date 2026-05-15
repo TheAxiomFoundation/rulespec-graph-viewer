@@ -2449,6 +2449,17 @@ body, html, #root {
   position: relative;
 }
 
+.irg-loading {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  color: var(--color-ink-muted);
+  font-family: var(--f-mono);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
 .irg-wrap.irg-fullscreen {
   width: 100vw;
   height: 100vh;

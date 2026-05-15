@@ -130,6 +130,7 @@ export function App() {
     () => buildStructureTraces(graph, selectedOutputs),
     [graph, selectedOutputs],
   );
+  const graphReady = Boolean(graph);
 
   function toggleOutput(legalId: LegalId) {
     setSelectedOutputs((current) =>
@@ -233,7 +234,7 @@ export function App() {
           </div>
         </header>
 
-        {selectedOutputs.length > 0 && (
+        {graphReady && selectedOutputs.length > 0 && (
           <div className="selected-output-strip" aria-label="Selected outputs">
             {selectedOutputs.map((legalId) => (
               <button
@@ -248,10 +249,11 @@ export function App() {
           </div>
         )}
 
-        {loading && <div className="status">Loading graph…</div>}
         {error && <div className="status error">{error}</div>}
 
-        {Object.keys(structureTraces).length > 0 ? (
+        {loading ? (
+          <div className="empty-state">Loading graph…</div>
+        ) : Object.keys(structureTraces).length > 0 ? (
           <InteractiveRuleGraph
             spec={spec}
             traces={structureTraces}
