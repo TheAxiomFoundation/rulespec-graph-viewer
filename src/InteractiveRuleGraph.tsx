@@ -886,7 +886,7 @@ function miniMapColor(d: IrgNodeData): string {
     case "output": return "#1c1917";
     case "input": return d.source === "user" ? "#166534" : "#b45309";
     case "ruleRef": return "#92400e";
-    case "unknown": return d.isParameter ? "#4338ca" : "#a8a29e";
+    case "unknown": return d.isParameter ? "#78716c" : "#a8a29e";
     case "ifGate": return "#92400e";
     case "operator": return "#92400e";
     case "literal": return "#e7e5e4";
