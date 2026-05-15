@@ -11,6 +11,11 @@ import {
 } from "./api";
 import type { ComputeResponse, DashboardSpec, LegalId, ParameterRule, ProgramGraph, ProgramRef, ProgramSummary, RuleNode } from "./types";
 
+const SNAP_PROGRAM_LABELS: Record<string, string> = {
+  "rules-us-co/policies/cdhs/snap/fy-2026-benefit-calculation.yaml": "Colorado SNAP FY 2026",
+  "rules-us-ny/policies/otda/snap/fy-2026-benefit-calculation.yaml": "New York SNAP FY 2026",
+};
+
 export function App() {
   const computeUrl = DEFAULT_COMPUTE_URL;
   const [program, setProgram] = useState<ProgramRef>(DEFAULT_PROGRAM);
@@ -326,7 +331,7 @@ async function filterProgramsWithCalculationStructure(
   computeUrl: string,
   candidates: ProgramSummary[],
 ): Promise<ProgramSummary[]> {
-  const policies = candidates.filter((item) => item.kind === "policies");
+  const policies = candidates.filter(isSupportedSnapProgram);
   const visualizable: ProgramSummary[] = [];
   let cursor = 0;
 
@@ -350,12 +355,18 @@ async function filterProgramsWithCalculationStructure(
   return visualizable.sort((a, b) => displayNameForProgram(a).localeCompare(displayNameForProgram(b)));
 }
 
+function isSupportedSnapProgram(program: ProgramSummary): boolean {
+  return Boolean(SNAP_PROGRAM_LABELS[`${program.repo}/${program.path}`]);
+}
+
 function labelForRule(graph: ProgramGraph | null, legalId: LegalId): string {
   const rule = graph?.rules.find((candidate) => candidate.legalId === legalId);
   return humanize(rule?.name ?? legalId.split("#").pop() ?? legalId);
 }
 
 function displayNameForProgram(program: ProgramSummary): string {
+  const snapLabel = SNAP_PROGRAM_LABELS[`${program.repo}/${program.path}`];
+  if (snapLabel) return snapLabel;
   if (program.repo === DEFAULT_PROGRAM.repo && program.path === DEFAULT_PROGRAM.path) {
     return DEFAULT_PROGRAM.displayName ?? program.name;
   }
