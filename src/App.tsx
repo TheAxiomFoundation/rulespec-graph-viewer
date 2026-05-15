@@ -193,13 +193,16 @@ export function App() {
           <p className="program-summary">{summaryForProgram(programs, program)}</p>
         </section>
 
-        <section className="control-block">
-          <div className="section-head">
-            <h2>Outputs</h2>
-            <span>{selectedOutputs.length} selected</span>
+        <section className="control-block outputs-control">
+          <div className="section-head outputs-head">
+            <div>
+              <h2>Outputs</h2>
+              <span>Pick the graph results to show</span>
+            </div>
+            <strong>{selectedOutputs.length} selected</strong>
           </div>
           <label className="output-search">
-            Search outputs
+            <span>Search outputs</span>
             <input
               type="search"
               value={outputSearch}
