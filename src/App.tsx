@@ -261,7 +261,10 @@ export function App() {
           {error && <div className="status error">{error}</div>}
 
           {loading ? (
-            <div className="empty-state">Loading graph…</div>
+            <div className="loading-state" role="status" aria-live="polite">
+              <span className="loading-spinner" aria-hidden="true" />
+              <span>Loading graph...</span>
+            </div>
           ) : Object.keys(structureTraces).length > 0 ? (
             <InteractiveRuleGraph
               spec={spec}
