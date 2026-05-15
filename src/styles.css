@@ -154,7 +154,7 @@ textarea {
 }
 
 .outputs-control {
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto minmax(0, 1fr);
 }
 
 .outputs-head {
@@ -176,6 +176,38 @@ textarea {
   line-height: 1;
   padding: 6px 8px;
   white-space: nowrap;
+}
+
+.selected-output-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 72px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.selected-output-list button {
+  border: 1px solid #d4cabf;
+  border-radius: 999px;
+  background: #fffaf4;
+  color: #1d1915;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+  padding: 6px 8px;
+  text-align: left;
+}
+
+.selected-output-list button::after {
+  color: #8b431f;
+  content: " x";
+}
+
+.selected-output-list button:hover {
+  border-color: #b77755;
+  background: #f7eee5;
 }
 
 .output-search {

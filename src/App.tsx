@@ -126,6 +126,14 @@ export function App() {
   );
 
   const selectedSet = useMemo(() => new Set(selectedOutputs), [selectedOutputs]);
+  const selectedOutputRules = useMemo(
+    () =>
+      selectedOutputs.map((legalId) => ({
+        legalId,
+        label: labelForRule(graph, legalId),
+      })),
+    [graph, selectedOutputs],
+  );
   const structureTraces = useMemo(
     () => buildStructureTraces(graph, selectedOutputs),
     [graph, selectedOutputs],
@@ -200,6 +208,20 @@ export function App() {
             </div>
             <strong>{selectedOutputs.length} selected</strong>
           </div>
+          {selectedOutputRules.length > 0 && (
+            <div className="selected-output-list" aria-label="Selected outputs">
+              {selectedOutputRules.map((output) => (
+                <button
+                  type="button"
+                  key={output.legalId}
+                  onClick={() => toggleOutput(output.legalId)}
+                  title="Remove output from graph"
+                >
+                  {output.label}
+                </button>
+              ))}
+            </div>
+          )}
           <label className="output-search">
             <span>Search outputs</span>
             <input
@@ -391,7 +413,6 @@ function rankOutputRules(graph: ProgramGraph | null): RuleNode[] {
         (/allotment|benefit|amount/i.test(rule.name) ? 25 : 0),
     }))
     .sort((a, b) => b.score - a.score || a.rule.name.localeCompare(b.rule.name))
-    .slice(0, 40)
     .map(({ rule }) => rule);
 }
 
