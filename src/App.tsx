@@ -4,12 +4,11 @@ import {
   DEFAULT_COMPUTE_URL,
   DEFAULT_OUTPUTS,
   DEFAULT_PROGRAM,
-  computeTrace,
   fetchPrograms,
   fetchProgramGraph,
   fetchRepos,
 } from "./api";
-import type { ComputeResponse, DashboardSpec, LegalId, ParameterRule, ProgramGraph, ProgramRef, ProgramSummary, RuleNode } from "./types";
+import type { DashboardSpec, LegalId, ParameterRule, ProgramGraph, ProgramRef, ProgramSummary, RuleNode, TraceNode } from "./types";
 
 const SNAP_PROGRAM_LABELS: Record<string, string> = {
   "rules-us-co/policies/cdhs/snap/fy-2026-benefit-calculation.yaml": "Colorado SNAP FY 2026",
@@ -22,7 +21,6 @@ export function App() {
   const [programs, setPrograms] = useState<ProgramSummary[]>([]);
   const [graph, setGraph] = useState<ProgramGraph | null>(null);
   const [selectedOutputs, setSelectedOutputs] = useState<LegalId[]>(DEFAULT_OUTPUTS);
-  const [result, setResult] = useState<ComputeResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [programsLoading, setProgramsLoading] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -74,25 +72,6 @@ export function App() {
       cancelled = true;
     };
   }, [computeUrl, program]);
-
-  useEffect(() => {
-    if (selectedOutputs.length === 0) {
-      setResult(null);
-      return;
-    }
-    let cancelled = false;
-    setError(null);
-    computeTrace(computeUrl, program, selectedOutputs)
-      .then((nextResult) => {
-        if (!cancelled) setResult(nextResult);
-      })
-      .catch((err) => {
-        if (!cancelled) setError(String(err));
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [computeUrl, program, selectedOutputs]);
 
   const outputRules = useMemo(() => rankOutputRules(graph), [graph]);
   const filteredOutputRules = useMemo(() => {
@@ -147,6 +126,10 @@ export function App() {
   );
 
   const selectedSet = useMemo(() => new Set(selectedOutputs), [selectedOutputs]);
+  const structureTraces = useMemo(
+    () => buildStructureTraces(graph, selectedOutputs),
+    [graph, selectedOutputs],
+  );
 
   function toggleOutput(legalId: LegalId) {
     setSelectedOutputs((current) =>
@@ -165,7 +148,6 @@ export function App() {
       displayName: displayNameForProgram(next),
     });
     setGraph(null);
-    setResult(null);
     setSelectedOutputs([]);
   }
 
@@ -269,16 +251,11 @@ export function App() {
 
         {loading && <div className="status">Loading graph…</div>}
         {error && <div className="status error">{error}</div>}
-        {result?.warnings?.map((warning) => (
-          <div className="status warning" key={warning}>
-            {warning}
-          </div>
-        ))}
 
-        {result && selectedOutputs.length > 0 ? (
+        {Object.keys(structureTraces).length > 0 ? (
           <InteractiveRuleGraph
             spec={spec}
-            traces={result.traces}
+            traces={structureTraces}
             showValues={false}
             parameterRules={parameterRules}
             selectedOutputIds={selectedSet}
@@ -298,6 +275,117 @@ function pickDefaultOutputs(graph: ProgramGraph): LegalId[] {
     .filter((id): id is string => !!id);
   if (curated.length > 0) return curated;
   return rankOutputRules(graph).slice(0, 2).map((rule) => rule.legalId);
+}
+
+function buildStructureTraces(
+  graph: ProgramGraph | null,
+  outputIds: LegalId[],
+): Record<string, TraceNode> {
+  if (!graph) return {};
+
+  const rulesById = new Map(graph.rules.map((rule) => [rule.legalId, rule]));
+  const inputsById = new Map(graph.inputs.map((input) => [input.legalId, input]));
+  const relationsById = new Map(graph.relations.map((relation) => [relation.legalId, relation]));
+  const cache = new Map<LegalId, TraceNode>();
+
+  function nodeFor(legalId: LegalId, stack: Set<LegalId> = new Set()): TraceNode {
+    const cached = cache.get(legalId);
+    if (cached) return cached;
+
+    const rule = rulesById.get(legalId);
+    if (rule) {
+      const trace: TraceNode = {
+        legalId: rule.legalId,
+        label: rule.name,
+        value: null,
+        dtype: traceDtype(rule.dtype),
+        source: rule.source ?? undefined,
+        formula: rule.formula ?? null,
+        children: [],
+      };
+      cache.set(legalId, trace);
+      if (!stack.has(legalId)) {
+        const nextStack = new Set(stack).add(legalId);
+        trace.children = [
+          ...rule.ruleDeps,
+          ...rule.inputDeps,
+          ...rule.relationDeps,
+        ].map((depId) => nodeFor(depId, nextStack));
+      }
+      return trace;
+    }
+
+    const input = inputsById.get(legalId);
+    if (input) {
+      const trace: TraceNode = {
+        legalId: input.legalId,
+        label: input.name,
+        value: scalarSample(input.sample),
+        dtype: "input",
+        inputSource: "default",
+        source: input.fileLegalId,
+        homeFile: input.fileLegalId,
+        children: [],
+      };
+      cache.set(legalId, trace);
+      return trace;
+    }
+
+    const relation = relationsById.get(legalId);
+    if (relation) {
+      const trace: TraceNode = {
+        legalId: relation.legalId,
+        label: relation.name,
+        value: null,
+        dtype: "input",
+        inputSource: "default",
+        source: relation.fileLegalId,
+        homeFile: relation.fileLegalId,
+        children: [],
+      };
+      cache.set(legalId, trace);
+      return trace;
+    }
+
+    const trace: TraceNode = {
+      legalId,
+      label: legalId.split("#").pop()?.replace(/^(input|relation)\./, "") ?? legalId,
+      value: null,
+      dtype: "input",
+      inputSource: "default",
+      children: [],
+    };
+    cache.set(legalId, trace);
+    return trace;
+  }
+
+  return Object.fromEntries(
+    outputIds
+      .filter((legalId) => rulesById.has(legalId))
+      .map((legalId) => [legalId, nodeFor(legalId)]),
+  );
+}
+
+function traceDtype(dtype: string | null): TraceNode["dtype"] {
+  const normalized = (dtype ?? "").toLowerCase();
+  if (normalized === "judgment") return "judgment";
+  if (normalized === "boolean" || normalized === "bool") return "boolean";
+  if (normalized === "integer") return "integer";
+  if (normalized === "date") return "date";
+  if (normalized === "string" || normalized === "text") return "string";
+  return "decimal";
+}
+
+function scalarSample(value: unknown): TraceNode["value"] {
+  if (
+    value === null ||
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  ) {
+    return value;
+  }
+  return null;
 }
 
 function rankOutputRules(graph: ProgramGraph | null): RuleNode[] {

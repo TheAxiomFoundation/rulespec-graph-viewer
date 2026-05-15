@@ -78,10 +78,26 @@ export interface RuleNode {
   formula?: string | null;
 }
 
+export interface InputNode {
+  legalId: LegalId;
+  name: string;
+  fileLegalId: string;
+  sample?: unknown;
+  entity?: string | null;
+  relationLegalId?: LegalId | null;
+}
+
+export interface RelationNode {
+  legalId: LegalId;
+  name: string;
+  fileLegalId: string;
+  memberInputIds?: LegalId[];
+}
+
 export interface ProgramGraph {
   rules: RuleNode[];
-  inputs: unknown[];
-  relations: unknown[];
+  inputs: InputNode[];
+  relations: RelationNode[];
   ownOutputs: LegalId[];
   terminalOutputs: LegalId[];
 }
