@@ -113,18 +113,13 @@ textarea {
   outline: none;
 }
 
-.output-option,
-.selected-output-strip button {
+.output-option {
   border: 1px solid #1d1915;
   border-radius: 6px;
   background: #1d1915;
   color: #fff;
   cursor: pointer;
   padding: 11px 13px;
-}
-
-.selected-output-strip button:hover {
-  background: #342d27;
 }
 
 .program-summary {
@@ -203,8 +198,7 @@ textarea {
 }
 
 .output-option {
-  display: grid;
-  gap: 3px;
+  display: block;
   border-color: #ded8d1;
   background: #fff;
   color: #181512;
@@ -232,11 +226,6 @@ textarea {
   font-weight: 700;
 }
 
-.output-option small {
-  color: #746d65;
-  font-size: 11px;
-}
-
 .output-empty {
   border: 1px dashed #d2c8bd;
   border-radius: 6px;
@@ -248,7 +237,7 @@ textarea {
 
 .viewer-panel {
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 12px;
   height: 100vh;
   min-width: 0;
@@ -259,7 +248,7 @@ textarea {
 
 .graph-stage {
   display: grid;
-  grid-row: 3;
+  grid-row: 2;
   grid-template-rows: auto minmax(0, 1fr);
   gap: 12px;
   min-height: 0;
@@ -291,27 +280,6 @@ textarea {
   letter-spacing: 0;
   line-height: 0.96;
   margin: 0;
-}
-
-.selected-output-strip {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 0;
-}
-
-.selected-output-strip button {
-  border-color: #d4cabf;
-  background: #fff;
-  color: #1d1915;
-  font-size: 13px;
-  font-weight: 700;
-  padding: 8px 11px;
-}
-
-.selected-output-strip button::after {
-  content: " x";
-  color: #8b431f;
 }
 
 .status,

@@ -130,7 +130,6 @@ export function App() {
     () => buildStructureTraces(graph, selectedOutputs),
     [graph, selectedOutputs],
   );
-  const graphReady = Boolean(graph);
 
   function toggleOutput(legalId: LegalId) {
     setSelectedOutputs((current) =>
@@ -219,7 +218,6 @@ export function App() {
                 onClick={() => toggleOutput(rule.legalId)}
               >
                 <span>{humanize(rule.name)}</span>
-                <small>{rule.dtype ?? rule.kind ?? "rule"}</small>
               </button>
             ))}
             {filteredOutputRules.length === 0 && (
@@ -236,21 +234,6 @@ export function App() {
             <h1>{program.displayName ?? "RuleSpec program"}</h1>
           </div>
         </header>
-
-        {graphReady && selectedOutputs.length > 0 && (
-          <div className="selected-output-strip" aria-label="Selected outputs">
-            {selectedOutputs.map((legalId) => (
-              <button
-                key={legalId}
-                type="button"
-                onClick={() => toggleOutput(legalId)}
-                title="Remove output from graph"
-              >
-                {labelForRule(graph, legalId)}
-              </button>
-            ))}
-          </div>
-        )}
 
         <div className="graph-stage">
           {error && <div className="status error">{error}</div>}
