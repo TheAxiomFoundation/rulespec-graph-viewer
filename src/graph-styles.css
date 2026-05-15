@@ -2713,6 +2713,30 @@ body, html, #root {
   overflow-wrap: anywhere;
   word-break: break-word;
 }
+.irg-pop-value {
+  display: grid;
+  gap: 3px;
+  margin: 4px 0 6px;
+  padding: 6px 7px;
+  border: 1px solid var(--color-rule);
+  border-radius: 3px;
+  background: var(--color-rule-subtle);
+}
+.irg-pop-value span {
+  font-family: var(--f-mono);
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-ink-muted);
+}
+.irg-pop-value strong {
+  font-family: var(--f-mono);
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.35;
+  color: var(--color-ink);
+  overflow-wrap: anywhere;
+}
 .irg-pop-cite {
   font-family: var(--f-serif);
   font-style: italic;

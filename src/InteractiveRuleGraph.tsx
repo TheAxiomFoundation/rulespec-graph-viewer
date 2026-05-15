@@ -437,6 +437,8 @@ interface NodeMeta {
   /** For rules: a one-liner of the rule's formula (truncated) so the user
    *  gets the "what does this compute" without expanding. */
   formulaPreview?: string;
+  /** For parameters: the constant value or expression backing the parameter. */
+  parameterValue?: string;
 }
 
 type IrgNodeData =
@@ -634,6 +636,12 @@ const NodeInfo = ({
     >
       <div className="irg-pop-eyebrow">{meta.kindLine}</div>
       <div className="irg-pop-title">{softBreak(humanizeLabel(title))}</div>
+      {meta.parameterValue && (
+        <div className="irg-pop-value">
+          <span>Value</span>
+          <strong>{meta.parameterValue}</strong>
+        </div>
+      )}
       {meta.formulaPreview && (
         <div className="irg-pop-formula">{meta.formulaPreview}</div>
       )}
@@ -1701,7 +1709,7 @@ function buildParameterMeta(p: ParameterRule): NodeMeta {
     citation,
     legalId: p.legalId,
     appUrl,
-    formulaPreview: valuePreview,
+    parameterValue: valuePreview,
   };
 }
 
@@ -1726,7 +1734,7 @@ function buildMeta(t: TraceNode, kind: "Output" | "Input" | "Rule" | "Parameter"
     citation,
     legalId: t.legalId,
     appUrl,
-    formulaPreview:
+    parameterValue:
       kind === "Parameter" && t.formula
         ? truncate(t.formula.replace(/\s+/g, " ").trim(), 140)
         : undefined,
