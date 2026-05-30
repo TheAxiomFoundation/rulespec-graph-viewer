@@ -14,7 +14,6 @@ const SNAP_PROGRAM_LABELS: Record<string, string> = {
   "rules-us-co/policies/cdhs/snap/fy-2026-benefit-calculation.yaml": "Colorado SNAP FY 2026",
   "rules-us-ca/programs/snap/fy-2026.yaml": "California SNAP FY 2026",
   "rules-us-ny/programs/snap/fy-2026.yaml": "New York SNAP FY 2026",
-  "rules-us-ny/policies/otda/snap/fy-2026-benefit-calculation.yaml": "New York SNAP FY 2026",
 };
 
 export function App() {
@@ -33,7 +32,12 @@ export function App() {
     setProgramsLoading(true);
     fetchRepos(computeUrl)
       .then((repos) => Promise.all(repos.map((repo) => fetchPrograms(computeUrl, repo))))
-      .then((lists) => filterProgramsWithCalculationStructure(computeUrl, lists.flat()))
+      .then((lists) =>
+        lists
+          .flat()
+          .filter(isSupportedSnapProgram)
+          .sort((a, b) => displayNameForProgram(a).localeCompare(displayNameForProgram(b))),
+      )
       .then((visualizablePrograms) => {
         if (cancelled) return;
         setPrograms(visualizablePrograms);
@@ -429,34 +433,6 @@ function isGraphableOutputRule(rule: RuleNode): boolean {
     rule.inputDeps.length > 0 ||
     rule.relationDeps.length > 0
   );
-}
-
-async function filterProgramsWithCalculationStructure(
-  computeUrl: string,
-  candidates: ProgramSummary[],
-): Promise<ProgramSummary[]> {
-  const policies = candidates.filter(isSupportedSnapProgram);
-  const visualizable: ProgramSummary[] = [];
-  let cursor = 0;
-
-  async function worker() {
-    while (cursor < policies.length) {
-      const item = policies[cursor++];
-      try {
-        const graph = await fetchProgramGraph(computeUrl, {
-          repo: item.repo,
-          path: item.path,
-          displayName: displayNameForProgram(item),
-        });
-        if (rankOutputRules(graph).length > 0) visualizable.push(item);
-      } catch {
-        // Skip programs whose graph cannot be loaded from the current compute service.
-      }
-    }
-  }
-
-  await Promise.all(Array.from({ length: Math.min(8, policies.length) }, worker));
-  return visualizable.sort((a, b) => displayNameForProgram(a).localeCompare(displayNameForProgram(b)));
 }
 
 function isSupportedSnapProgram(program: ProgramSummary): boolean {
