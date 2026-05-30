@@ -12,6 +12,8 @@ import type { DashboardSpec, LegalId, ParameterRule, ProgramGraph, ProgramRef, P
 
 const SNAP_PROGRAM_LABELS: Record<string, string> = {
   "rules-us-co/policies/cdhs/snap/fy-2026-benefit-calculation.yaml": "Colorado SNAP FY 2026",
+  "rules-us-ca/programs/snap/fy-2026.yaml": "California SNAP FY 2026",
+  "rules-us-ny/programs/snap/fy-2026.yaml": "New York SNAP FY 2026",
   "rules-us-ny/policies/otda/snap/fy-2026-benefit-calculation.yaml": "New York SNAP FY 2026",
 };
 
@@ -284,7 +286,7 @@ export function App() {
 
 function pickDefaultOutputs(graph: ProgramGraph): LegalId[] {
   const byName = new Map(graph.rules.map((rule) => [rule.name, rule.legalId]));
-  const curated = ["snap_eligible", "snap_allotment"]
+  const curated = ["snap_eligible", "snap_benefit", "snap_allotment"]
     .map((name) => byName.get(name))
     .filter((id): id is string => !!id);
   if (curated.length > 0) return curated;
