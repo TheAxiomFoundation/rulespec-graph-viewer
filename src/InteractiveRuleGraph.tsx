@@ -729,7 +729,7 @@ const OutputNode = ({ data }: NodeProps) => {
       ref={ref}
       className={`irg-node irg-output ${d.showValues ? d.verdictCls : "irg-neutral"}`}
     >
-      <HandleTarget />
+      <HandleBoth />
       <InfoBadge open={pop.open} onEnter={pop.enter} onLeave={pop.leave} />
       <div className="irg-eyebrow">Result</div>
       <div className="irg-label">{softBreak(humanizeLabel(d.label))}</div>
@@ -993,35 +993,38 @@ function buildGraph(
     }
   }
 
+  const walkCtx: WalkCtx = {
+    nodes,
+    edges,
+    nodeIds,
+    nextId,
+    byName,
+    traceByLegalId,
+    collapsed,
+    exposedInputIds,
+    canExposeInputs,
+    showValues,
+    parametersByName,
+    selectedOutputIds,
+    outputNodeIdByLegalId,
+  };
+
   for (const binding of outputBindings) {
     const outputTrace = traces[binding.legalId]!;
     const outputId = `out:${binding.legalId}`;
+    const outputNodeId = nodeIds.get(outputId)!;
     const isExpanded = !collapsed.has(binding.legalId);
     if (outputTrace.formula && isExpanded) {
       const sourceId = walkExpr(
         outputTrace.formula,
         outputTrace.legalId,
-        {
-          nodes,
-          edges,
-          nodeIds,
-          nextId,
-          byName,
-          traceByLegalId,
-          collapsed,
-          exposedInputIds,
-          canExposeInputs,
-          showValues,
-          parametersByName,
-          selectedOutputIds,
-          outputNodeIdByLegalId,
-        },
+        walkCtx,
       );
       if (sourceId) {
         edges.push({
           id: `e${edges.length}`,
           source: sourceId,
-          target: nodeIds.get(outputId)!,
+          target: outputNodeId,
           type: "smoothstep",
           animated: false,
           className: "irg-edge-default",
@@ -1029,6 +1032,10 @@ function buildGraph(
           style: { strokeWidth: 1.5 },
         });
       }
+    }
+
+    if (detail === "wires" && isExpanded) {
+      wireTraceChildren(outputTrace, outputNodeId, walkCtx);
     }
   }
 
@@ -1050,6 +1057,65 @@ function buildGraph(
 
   layout(nodes, edges);
   return { nodes, edges };
+}
+
+function wireTraceChildren(parent: TraceNode, parentNodeId: string, ctx: WalkCtx): void {
+  for (const child of parent.children ?? []) {
+    const childNodeId = ensureTraceNode(child, ctx);
+    addEdge(ctx, childNodeId, parentNodeId, "");
+  }
+}
+
+function ensureTraceNode(t: TraceNode, ctx: WalkCtx): string {
+  if (t.dtype === "input") {
+    const exposed = ctx.exposedInputIds?.has(t.legalId) ?? t.inputSource === "user";
+    const dedupKey = `input:${t.legalId}`;
+    const label =
+      (t.label && t.label.trim()) ||
+      t.legalId.split("#").pop()?.replace(/^input\./, "").replace(/^relation\./, "") ||
+      "(unnamed)";
+    return ensureNode(ctx, dedupKey, {
+      type: "input",
+      data: {
+        kind: "input",
+        label,
+        legalId: t.legalId,
+        source: exposed ? "user" : "default",
+        canExpose: !exposed && ctx.canExposeInputs,
+        value: ctx.showValues ? formatValue(t.value) : "",
+        showValues: ctx.showValues,
+        meta: buildMeta(t, "Input"),
+      } satisfies IrgNodeData,
+    });
+  }
+
+  const existingOutputId = ctx.outputNodeIdByLegalId.get(t.legalId);
+  if (existingOutputId) return existingOutputId;
+
+  const isParameter = t.ruleKind === "parameter";
+  const isExpanded = !ctx.collapsed.has(t.legalId);
+  const ruleNodeId = ensureNode(ctx, `rule:${t.legalId}`, {
+    type: "ruleRef",
+    data: {
+      kind: "ruleRef",
+      label: t.label || t.legalId.split("#").pop() || "(unnamed)",
+      legalId: t.legalId,
+      canExpand: Boolean(t.formula) && !isParameter,
+      isParameter,
+      isOutput: ctx.selectedOutputIds?.has(t.legalId) ?? false,
+      verdictCls: verdictClass(t),
+      value: ctx.showValues ? formatValue(t.value) : "",
+      isExpanded,
+      showValues: ctx.showValues,
+      meta: buildMeta(t, isParameter ? "Parameter" : "Rule"),
+    } satisfies IrgNodeData,
+  });
+
+  if (isExpanded && !isParameter) {
+    wireTraceChildren(t, ruleNodeId, ctx);
+  }
+
+  return ruleNodeId;
 }
 
 /**

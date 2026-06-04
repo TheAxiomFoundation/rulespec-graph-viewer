@@ -1,43 +1,39 @@
 import { useEffect, useMemo, useState } from "react";
 import { InteractiveRuleGraph } from "./InteractiveRuleGraph";
 import {
+  COUNTRY_OPTIONS,
   DEFAULT_COMPUTE_URL,
-  DEFAULT_OUTPUTS,
-  DEFAULT_PROGRAM,
-  fetchPrograms,
+  DEFAULT_OUTPUTS_BY_COUNTRY,
+  DEFAULT_PROGRAM_BY_COUNTRY,
+  displayNameForProgram,
+  fetchProgramsForCountry,
   fetchProgramGraph,
-  fetchRepos,
+  summaryForProgram,
 } from "./api";
-import type { DashboardSpec, LegalId, ParameterRule, ProgramGraph, ProgramRef, ProgramSummary, RuleNode, TraceNode } from "./types";
-
-const SNAP_PROGRAM_LABELS: Record<string, string> = {
-  "rules-us-co/policies/cdhs/snap/fy-2026-benefit-calculation.yaml": "Colorado SNAP FY 2026",
-  "rules-us-ca/programs/snap/fy-2026.yaml": "California SNAP FY 2026",
-  "rules-us-ny/programs/snap/fy-2026.yaml": "New York SNAP FY 2026",
-};
+import type { Country, DashboardSpec, LegalId, ParameterRule, ProgramGraph, ProgramRef, ProgramSummary, RuleNode, TraceNode } from "./types";
 
 export function App() {
   const computeUrl = DEFAULT_COMPUTE_URL;
-  const [program, setProgram] = useState<ProgramRef>(DEFAULT_PROGRAM);
+  const [country, setCountry] = useState<Country>(() => initialCountry());
+  const [program, setProgram] = useState<ProgramRef>(() => DEFAULT_PROGRAM_BY_COUNTRY[initialCountry()]);
   const [programs, setPrograms] = useState<ProgramSummary[]>([]);
   const [graph, setGraph] = useState<ProgramGraph | null>(null);
-  const [selectedOutputs, setSelectedOutputs] = useState<LegalId[]>(DEFAULT_OUTPUTS);
+  const [selectedOutputs, setSelectedOutputs] = useState<LegalId[]>(
+    () => DEFAULT_OUTPUTS_BY_COUNTRY[initialCountry()],
+  );
   const [error, setError] = useState<string | null>(null);
   const [programsLoading, setProgramsLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [outputSearch, setOutputSearch] = useState("");
 
   useEffect(() => {
+    syncCountryToUrl(country);
+  }, [country]);
+
+  useEffect(() => {
     let cancelled = false;
     setProgramsLoading(true);
-    fetchRepos(computeUrl)
-      .then((repos) => Promise.all(repos.map((repo) => fetchPrograms(computeUrl, repo))))
-      .then((lists) =>
-        lists
-          .flat()
-          .filter(isSupportedSnapProgram)
-          .sort((a, b) => displayNameForProgram(a).localeCompare(displayNameForProgram(b))),
-      )
+    fetchProgramsForCountry(computeUrl, country)
       .then((visualizablePrograms) => {
         if (cancelled) return;
         setPrograms(visualizablePrograms);
@@ -51,7 +47,7 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, [computeUrl]);
+  }, [computeUrl, country]);
 
   useEffect(() => {
     let cancelled = false;
@@ -65,7 +61,7 @@ export function App() {
           const legalIds = new Set(nextGraph.rules.map((rule) => rule.legalId));
           const retained = current.filter((id) => legalIds.has(id));
           if (retained.length > 0) return retained;
-          return pickDefaultOutputs(nextGraph);
+          return pickDefaultOutputs(nextGraph, country);
         });
       })
       .catch((err) => {
@@ -77,7 +73,7 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, [computeUrl, program]);
+  }, [computeUrl, program, country]);
 
   const outputRules = useMemo(() => rankOutputRules(graph), [graph]);
   const filteredOutputRules = useMemo(() => {
@@ -159,10 +155,21 @@ export function App() {
     setProgram({
       repo: next.repo,
       path: next.path,
-      displayName: displayNameForProgram(next),
+      displayName: displayNameForProgram(country, next),
     });
     setGraph(null);
     setSelectedOutputs([]);
+  }
+
+  function selectCountry(nextCountry: Country) {
+    if (nextCountry === country) return;
+    setCountry(nextCountry);
+    setProgram(DEFAULT_PROGRAM_BY_COUNTRY[nextCountry]);
+    setGraph(null);
+    setPrograms([]);
+    setSelectedOutputs(DEFAULT_OUTPUTS_BY_COUNTRY[nextCountry]);
+    setOutputSearch("");
+    setError(null);
   }
 
   return (
@@ -198,7 +205,7 @@ export function App() {
               )}
               {programs.map((item) => (
                 <option key={`${item.repo}/${item.path}`} value={`${item.repo}/${item.path}`}>
-                  {displayNameForProgram(item)}
+                  {displayNameForProgram(country, item)}
                 </option>
               ))}
             </select>
@@ -261,6 +268,21 @@ export function App() {
             <p>{program.repo}</p>
             <h1>{program.displayName ?? "RuleSpec program"}</h1>
           </div>
+          <div className="country-toggle" role="tablist" aria-label="Country">
+            {COUNTRY_OPTIONS.map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                role="tab"
+                aria-selected={country === option.id}
+                className={`country-toggle-btn ${country === option.id ? "is-active" : ""}`}
+                onClick={() => selectCountry(option.id)}
+                title={option.label}
+              >
+                {option.shortLabel}
+              </button>
+            ))}
+          </div>
         </header>
 
         <div className="graph-stage">
@@ -288,9 +310,13 @@ export function App() {
   );
 }
 
-function pickDefaultOutputs(graph: ProgramGraph): LegalId[] {
+function pickDefaultOutputs(graph: ProgramGraph, country: Country): LegalId[] {
   const byName = new Map(graph.rules.map((rule) => [rule.name, rule.legalId]));
-  const curated = ["snap_eligible", "snap_benefit", "snap_allotment"]
+  const curatedNames =
+    country === "uk"
+      ? ["universal_credit_award_amount"]
+      : ["snap_eligible", "snap_benefit", "snap_allotment"];
+  const curated = curatedNames
     .map((name) => byName.get(name))
     .filter((id): id is string => !!id);
   if (curated.length > 0) return curated;
@@ -419,7 +445,8 @@ function rankOutputRules(graph: ProgramGraph | null): RuleNode[] {
       score:
         (terminal.has(rule.legalId) ? 100 : 0) +
         (/eligible|eligibility/i.test(rule.name) ? 30 : 0) +
-        (/allotment|benefit|amount/i.test(rule.name) ? 25 : 0),
+        (/allotment|benefit|amount|award|allowance|deduction/i.test(rule.name) ? 25 : 0) +
+        (/universal_credit_award_amount/i.test(rule.name) ? 40 : 0),
     }))
     .sort((a, b) => b.score - a.score || a.rule.name.localeCompare(b.rule.name))
     .map(({ rule }) => rule);
@@ -435,30 +462,28 @@ function isGraphableOutputRule(rule: RuleNode): boolean {
   );
 }
 
-function isSupportedSnapProgram(program: ProgramSummary): boolean {
-  return Boolean(SNAP_PROGRAM_LABELS[`${program.repo}/${program.path}`]);
-}
-
 function labelForRule(graph: ProgramGraph | null, legalId: LegalId): string {
   const rule = graph?.rules.find((candidate) => candidate.legalId === legalId);
   return humanize(rule?.name ?? legalId.split("#").pop() ?? legalId);
 }
 
-function displayNameForProgram(program: ProgramSummary): string {
-  const snapLabel = SNAP_PROGRAM_LABELS[`${program.repo}/${program.path}`];
-  if (snapLabel) return snapLabel;
-  if (program.repo === DEFAULT_PROGRAM.repo && program.path === DEFAULT_PROGRAM.path) {
-    return DEFAULT_PROGRAM.displayName ?? program.name;
-  }
-  const fallback = program.path.replace(/\.yaml$/, "").split("/").pop() ?? program.path;
-  return humanize(program.name || fallback);
-}
-
-function summaryForProgram(programs: ProgramSummary[], program: ProgramRef): string {
-  const match = programs.find((item) => item.repo === program.repo && item.path === program.path);
-  return match?.summary ?? program.path;
-}
-
 function humanize(value: string): string {
-  return value.replace(/^snap_/, "").replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
+  return value
+    .replace(/^snap_/, "")
+    .replace(/^universal_credit_/, "UC ")
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function initialCountry(): Country {
+  if (typeof window === "undefined") return "us";
+  return new URL(window.location.href).searchParams.get("country") === "uk" ? "uk" : "us";
+}
+
+function syncCountryToUrl(country: Country) {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  if (country === "us") url.searchParams.delete("country");
+  else url.searchParams.set("country", country);
+  window.history.replaceState({}, "", url.toString());
 }

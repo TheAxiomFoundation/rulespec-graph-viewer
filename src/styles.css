@@ -42,6 +42,34 @@ textarea {
   overflow: hidden;
 }
 
+.country-toggle {
+  display: inline-flex;
+  flex: 0 0 auto;
+  width: max-content;
+  border: 1px solid #d2c8bd;
+  border-radius: 999px;
+  background: #fff;
+  padding: 2px;
+}
+
+.country-toggle-btn {
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #625b53;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  min-width: 44px;
+  padding: 6px 12px;
+}
+
+.country-toggle-btn.is-active {
+  background: #1d1915;
+  color: #fff;
+}
+
 .brand {
   display: grid;
   gap: 6px;
@@ -289,11 +317,16 @@ textarea {
 .viewer-header {
   align-items: flex-start;
   display: flex;
+  flex-wrap: wrap;
   gap: 24px;
   justify-content: space-between;
   margin-bottom: 0;
   padding-bottom: 14px;
   border-bottom: 1px solid #ded8d1;
+}
+
+.viewer-header > div:first-child {
+  min-width: 0;
 }
 
 .viewer-header p {
@@ -395,7 +428,7 @@ textarea {
   }
 
   .viewer-header {
-    display: grid;
+    display: flex;
   }
 
   .viewer-panel {

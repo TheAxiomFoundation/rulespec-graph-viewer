@@ -11,8 +11,9 @@ can evolve independently from the dashboard-building workflow.
 - Computes selected outputs in explain mode.
 - Renders the selected outputs as an interactive DAG with pan, zoom, minimap,
   expand/collapse controls, and optional live values.
-- Starts with Colorado SNAP FY 2026, but the repo/path fields can point at any
-  program exposed by the compute service.
+- Starts with Colorado SNAP FY 2026 and includes a US/UK selector.
+- The UK view currently ships a bundled compiled Universal Credit FY 2026-27
+  artifact, because the default compute service does not expose UK repos yet.
 
 ## Development
 

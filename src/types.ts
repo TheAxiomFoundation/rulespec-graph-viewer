@@ -1,4 +1,5 @@
 export type LegalId = string;
+export type Country = "us" | "uk";
 
 export interface ProgramRef {
   repo: string;
