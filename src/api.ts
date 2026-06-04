@@ -29,7 +29,7 @@ const UK_UNIVERSAL_CREDIT_PROGRAM: ProgramSummary = {
   kind: "local-compiled",
   name: "universal_credit_fy_2026_27",
   summary:
-    "End-to-end monthly Universal Credit award for FY 2026-27, composed from WRA 2012 s.8 and UC Regs 2013 regs 22, 24, 26, 27, 29, 34, and 36. Uses a bundled compiled artifact because the deployed compute API does not currently expose UK repos.",
+    "End-to-end monthly Universal Credit award for FY 2026-27, composed from WRA 2012 s.8 and UC Regs 2013 regs 22, 24, 26, 27, 29, 34, and 36, including Schedule 4/5 housing-cost paths through reg 26. Uses a bundled compiled artifact because the deployed compute API does not currently expose UK repos.",
 };
 
 const UK_PROGRAM_LABELS: Record<string, string> = {
