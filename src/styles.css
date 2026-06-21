@@ -430,14 +430,15 @@ textarea {
   }
 
   /* Keep the long output picker from expanding to its full height (50+
-     rows) and burying the graph far below the fold — cap it and let it
-     scroll internally, same as the desktop side panel does. */
+     rows) and burying the graph far below the fold. A compact fixed-height
+     scroll box keeps the picker usable while the graph stays within reach.
+     (50vh was still ~half the screen on a phone.) */
   .output-list {
-    max-height: 50vh;
+    max-height: 240px;
   }
 
   .selected-output-list {
-    max-height: 96px;
+    max-height: 72px;
   }
 
   /* Long output labels should wrap rather than risk pushing the layout
