@@ -411,7 +411,8 @@ textarea {
   body,
   #root {
     height: auto;
-    overflow: auto;
+    overflow-x: hidden;
+    overflow-y: auto;
   }
 
   .app-shell {
@@ -425,18 +426,44 @@ textarea {
     border-bottom: 1px solid #ded8d1;
     height: auto;
     overflow: visible;
+    padding: 18px 16px;
+  }
+
+  /* Keep the long output picker from expanding to its full height (50+
+     rows) and burying the graph far below the fold — cap it and let it
+     scroll internally, same as the desktop side panel does. */
+  .output-list {
+    max-height: 50vh;
+  }
+
+  .selected-output-list {
+    max-height: 96px;
+  }
+
+  /* Long output labels should wrap rather than risk pushing the layout
+     wider than the viewport. */
+  .output-option span,
+  .selected-output-list button {
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
 
   .viewer-header {
     display: flex;
+    gap: 12px;
+  }
+
+  .viewer-header h1 {
+    overflow-wrap: anywhere;
   }
 
   .viewer-panel {
     height: auto;
     overflow: visible;
+    padding: 16px;
   }
 
   .irg-wrap {
-    min-height: 560px;
+    min-height: 70vh;
   }
 }

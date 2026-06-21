@@ -3369,3 +3369,26 @@ code {
   padding: 1px 6px;
   border-radius: 2px;
 }
+
+/* ═══════════════════════════════════════════
+   Phone-width adjustments (graph canvas only)
+   Desktop layout is untouched. Pan/zoom still works
+   via the React Flow controls and touch gestures.
+   ═══════════════════════════════════════════ */
+
+@media (max-width: 640px) {
+  /* The minimap consumes a meaningful chunk of an already-small canvas
+     and is hard to use on touch; drop it on phones. */
+  .react-flow__minimap {
+    display: none;
+  }
+
+  /* Let the toolbar (detail switch + expand/collapse + fullscreen) wrap
+     within the canvas instead of overflowing off the right edge. */
+  .irg-toolbar {
+    right: 52px;
+    left: 12px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+}
