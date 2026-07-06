@@ -1,42 +1,40 @@
 import { useEffect, useMemo, useState } from "react";
 import { InteractiveRuleGraph } from "./InteractiveRuleGraph";
 import {
-  COUNTRY_OPTIONS,
-  DEFAULT_COMPUTE_URL,
-  DEFAULT_OUTPUTS_BY_COUNTRY,
-  DEFAULT_PROGRAM_BY_COUNTRY,
+  countriesFromPrograms,
+  countryLabel,
+  countryOf,
+  countryShortLabel,
+  defaultOutputsForProgram,
   displayNameForProgram,
-  fetchProgramsForCountry,
+  fetchAllPrograms,
   fetchProgramGraph,
+  programKey,
+  programRefFromSummary,
   summaryForProgram,
 } from "./api";
 import type { Country, DashboardSpec, LegalId, ParameterRule, ProgramGraph, ProgramRef, ProgramSummary, RuleNode, TraceNode } from "./types";
 
 export function App() {
-  const computeUrl = DEFAULT_COMPUTE_URL;
+  const [allPrograms, setAllPrograms] = useState<ProgramSummary[]>([]);
   const [country, setCountry] = useState<Country>(() => initialCountry());
-  const [program, setProgram] = useState<ProgramRef>(() => DEFAULT_PROGRAM_BY_COUNTRY[initialCountry()]);
-  const [programs, setPrograms] = useState<ProgramSummary[]>([]);
+  const [program, setProgram] = useState<ProgramRef | null>(null);
   const [graph, setGraph] = useState<ProgramGraph | null>(null);
-  const [selectedOutputs, setSelectedOutputs] = useState<LegalId[]>(
-    () => DEFAULT_OUTPUTS_BY_COUNTRY[initialCountry()],
-  );
+  const [selectedOutputs, setSelectedOutputs] = useState<LegalId[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [programsLoading, setProgramsLoading] = useState(false);
+  const [programsLoading, setProgramsLoading] = useState(true);
   const [loading, setLoading] = useState(false);
   const [outputSearch, setOutputSearch] = useState("");
 
-  useEffect(() => {
-    syncCountryToUrl(country);
-  }, [country]);
-
+  // Load the full program registry once; countries and the per-country program
+  // list are derived from it, so a newly compiled program appears here with no
+  // code change.
   useEffect(() => {
     let cancelled = false;
     setProgramsLoading(true);
-    fetchProgramsForCountry(computeUrl, country)
-      .then((visualizablePrograms) => {
-        if (cancelled) return;
-        setPrograms(visualizablePrograms);
+    fetchAllPrograms()
+      .then((programs) => {
+        if (!cancelled) setAllPrograms(programs);
       })
       .catch((err) => {
         if (!cancelled) setError(String(err));
@@ -47,13 +45,45 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, [computeUrl, country]);
+  }, []);
+
+  const countries = useMemo(() => countriesFromPrograms(allPrograms), [allPrograms]);
+  const programs = useMemo(
+    () => allPrograms.filter((item) => countryOf(item.jurisdiction) === country),
+    [allPrograms, country],
+  );
 
   useEffect(() => {
+    syncCountryToUrl(country);
+  }, [country]);
+
+  // Keep the country/program selection valid as the registry loads or the
+  // country changes: snap to an existing country, then default to its first
+  // program when none is selected.
+  useEffect(() => {
+    if (allPrograms.length === 0) return;
+    if (!countries.includes(country)) {
+      // Unknown country (bad ?country= param, or a country that lost its last
+      // program): prefer US, else the first available.
+      setCountry(countries.includes("us") ? "us" : countries[0]);
+      return;
+    }
+    const selectionValid =
+      program != null &&
+      countryOf(program.jurisdiction) === country &&
+      programs.some((item) => programKey(item) === programKey(program));
+    if (!selectionValid) {
+      const first = programs[0];
+      setProgram(first ? programRefFromSummary(first) : null);
+    }
+  }, [allPrograms, countries, country, programs, program]);
+
+  useEffect(() => {
+    if (!program) return;
     let cancelled = false;
     setLoading(true);
     setError(null);
-    fetchProgramGraph(computeUrl, program)
+    fetchProgramGraph(program)
       .then((nextGraph) => {
         if (cancelled) return;
         setGraph(nextGraph);
@@ -61,7 +91,7 @@ export function App() {
           const legalIds = new Set(nextGraph.rules.map((rule) => rule.legalId));
           const retained = current.filter((id) => legalIds.has(id));
           if (retained.length > 0) return retained;
-          return pickDefaultOutputs(nextGraph, country);
+          return defaultOutputsForProgram(nextGraph);
         });
       })
       .catch((err) => {
@@ -73,7 +103,7 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, [computeUrl, program, country]);
+  }, [program]);
 
   const outputRules = useMemo(() => rankOutputRules(graph), [graph]);
   const filteredOutputRules = useMemo(() => {
@@ -109,21 +139,24 @@ export function App() {
         })),
     [graph],
   );
-  const spec = useMemo<DashboardSpec>(
-    () => ({
-      specVersion: "0.1",
-      meta: {
-        title: program.displayName ?? program.path,
-      },
-      program,
-      period: { kind: "month", start: "2026-01-01" },
-      inputs: [],
-      outputs: selectedOutputs.map((legalId) => ({
-        id: legalId.split("#").pop() ?? legalId,
-        legalId,
-        label: labelForRule(graph, legalId),
-      })),
-    }),
+  const spec = useMemo<DashboardSpec | null>(
+    () =>
+      program
+        ? {
+            specVersion: "0.1",
+            meta: {
+              title: program.displayName ?? program.programId,
+            },
+            program,
+            period: { kind: "month", start: "2026-01-01" },
+            inputs: [],
+            outputs: selectedOutputs.map((legalId) => ({
+              id: legalId.split("#").pop() ?? legalId,
+              legalId,
+              label: labelForRule(graph, legalId),
+            })),
+          }
+        : null,
     [graph, program, selectedOutputs],
   );
 
@@ -150,13 +183,9 @@ export function App() {
   }
 
   function selectProgram(value: string) {
-    const next = programs.find((item) => `${item.repo}/${item.path}` === value);
+    const next = programs.find((item) => programKey(item) === value);
     if (!next) return;
-    setProgram({
-      repo: next.repo,
-      path: next.path,
-      displayName: displayNameForProgram(country, next),
-    });
+    setProgram(programRefFromSummary(next));
     setGraph(null);
     setSelectedOutputs([]);
   }
@@ -164,10 +193,10 @@ export function App() {
   function selectCountry(nextCountry: Country) {
     if (nextCountry === country) return;
     setCountry(nextCountry);
-    setProgram(DEFAULT_PROGRAM_BY_COUNTRY[nextCountry]);
+    // The selection effect picks the first program of the new country.
+    setProgram(null);
     setGraph(null);
-    setPrograms([]);
-    setSelectedOutputs(DEFAULT_OUTPUTS_BY_COUNTRY[nextCountry]);
+    setSelectedOutputs([]);
     setOutputSearch("");
     setError(null);
   }
@@ -195,22 +224,19 @@ export function App() {
           <label>
             Select program
             <select
-              value={`${program.repo}/${program.path}`}
+              value={program ? programKey(program) : ""}
               onChange={(event) => selectProgram(event.target.value)}
+              disabled={programs.length === 0}
             >
-              {programs.length === 0 && (
-                <option value={`${program.repo}/${program.path}`}>
-                  {program.displayName ?? program.path}
-                </option>
-              )}
+              {programs.length === 0 && <option value="">No programs available</option>}
               {programs.map((item) => (
-                <option key={`${item.repo}/${item.path}`} value={`${item.repo}/${item.path}`}>
-                  {displayNameForProgram(country, item)}
+                <option key={programKey(item)} value={programKey(item)}>
+                  {displayNameForProgram(item)}
                 </option>
               ))}
             </select>
           </label>
-          <p className="program-summary">{summaryForProgram(programs, program)}</p>
+          {program && <p className="program-summary">{summaryForProgram(programs, program)}</p>}
         </section>
 
         <section className="control-block outputs-control">
@@ -265,21 +291,21 @@ export function App() {
       <section className="viewer-panel">
         <header className="viewer-header">
           <div>
-            <p>{program.repo}</p>
-            <h1>{program.displayName ?? "RuleSpec program"}</h1>
+            <p>{program?.jurisdiction ?? ""}</p>
+            <h1>{program?.displayName ?? "RuleSpec program"}</h1>
           </div>
           <div className="country-toggle" role="tablist" aria-label="Country">
-            {COUNTRY_OPTIONS.map((option) => (
+            {countries.map((option) => (
               <button
-                key={option.id}
+                key={option}
                 type="button"
                 role="tab"
-                aria-selected={country === option.id}
-                className={`country-toggle-btn ${country === option.id ? "is-active" : ""}`}
-                onClick={() => selectCountry(option.id)}
-                title={option.label}
+                aria-selected={country === option}
+                className={`country-toggle-btn ${country === option ? "is-active" : ""}`}
+                onClick={() => selectCountry(option)}
+                title={countryLabel(option)}
               >
-                {option.shortLabel}
+                {countryShortLabel(option)}
               </button>
             ))}
           </div>
@@ -293,7 +319,7 @@ export function App() {
               <span className="loading-spinner" aria-hidden="true" />
               <span>Loading graph...</span>
             </div>
-          ) : Object.keys(structureTraces).length > 0 ? (
+          ) : spec && Object.keys(structureTraces).length > 0 ? (
             <InteractiveRuleGraph
               spec={spec}
               traces={structureTraces}
@@ -308,19 +334,6 @@ export function App() {
       </section>
     </main>
   );
-}
-
-function pickDefaultOutputs(graph: ProgramGraph, country: Country): LegalId[] {
-  const byName = new Map(graph.rules.map((rule) => [rule.name, rule.legalId]));
-  const curatedNames =
-    country === "uk"
-      ? ["universal_credit_award_amount"]
-      : ["snap_eligible", "snap_benefit", "snap_allotment"];
-  const curated = curatedNames
-    .map((name) => byName.get(name))
-    .filter((id): id is string => !!id);
-  if (curated.length > 0) return curated;
-  return rankOutputRules(graph).slice(0, 2).map((rule) => rule.legalId);
 }
 
 function buildStructureTraces(
@@ -477,7 +490,7 @@ function humanize(value: string): string {
 
 function initialCountry(): Country {
   if (typeof window === "undefined") return "us";
-  return new URL(window.location.href).searchParams.get("country") === "uk" ? "uk" : "us";
+  return new URL(window.location.href).searchParams.get("country") ?? "us";
 }
 
 function syncCountryToUrl(country: Country) {

@@ -1,18 +1,25 @@
 export type LegalId = string;
-export type Country = "us" | "uk";
+// A country groups one or more jurisdictions (e.g. "us" covers "us-co",
+// "us-az"). Kept as an open string so new countries appear from the registry
+// with no code change.
+export type Country = string;
 
 export interface ProgramRef {
-  repo: string;
-  path: string;
+  jurisdiction: string;
+  programId: string;
   displayName?: string;
 }
 
 export interface ProgramSummary {
-  repo: string;
-  path: string;
-  kind: string;
-  name: string;
-  summary?: string;
+  jurisdiction: string;
+  programId: string;
+  runtimeId: string;
+  mode: string;
+  status: string;
+  defaultOutputs: LegalId[];
+  outputCount?: number;
+  entityCount?: number;
+  inputCount?: number;
 }
 
 export interface PeriodRef {

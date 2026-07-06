@@ -2,34 +2,48 @@
 
 Standalone React tool for exploring Axiom RuleSpec computation graphs.
 
-This repo was extracted from `dashboard-builder` so the rule-graph experience
-can evolve independently from the dashboard-building workflow.
-
 ## What It Does
 
-- Loads a RuleSpec program graph from the compute API.
-- Computes selected outputs in explain mode.
-- Renders the selected outputs as an interactive DAG with pan, zoom, minimap,
-  expand/collapse controls, and optional live values.
-- Starts with Colorado SNAP FY 2026 and includes a US/UK selector.
-- The UK view currently ships a bundled compiled Universal Credit FY 2026-27
-  artifact, because the default compute service does not expose UK repos yet.
+- Lists every executable program the Axiom API exposes, grouped by country.
+- Loads a program's rule graph and renders it as an interactive DAG with pan,
+  zoom, minimap, expand/collapse controls, and per-output selection.
+- The program list is **registry-driven**: it comes from the Axiom API's
+  runtime-package registry, so a newly compiled program appears in the dropdown
+  with no change to this app. There is no per-program allowlist and no bundled
+  graph artifact.
+
+## Architecture
+
+```
+browser ──/api/axiom/*──▶ same-origin proxy ──x-api-key──▶ Axiom API (/v1)
+```
+
+- The browser only ever makes **same-origin** requests to `/api/axiom/*`. A
+  proxy forwards them to the Axiom API and injects the API key server-side, so
+  the key never reaches the browser bundle and there is no CORS dependency.
+  - Local dev: the Vite dev-server proxy (`vite.config.ts`).
+  - Production: a Vercel function (`api/axiom/[...path].ts`).
+- Program graphs come from `GET /v1/runtime/packages/{jurisdiction}/{program_id}/graph`.
+  The viewer no longer builds graphs client-side.
 
 ## Development
 
 ```bash
 pnpm install
+cp .env.example .env.local   # then set AXIOM_API_KEY
 pnpm dev
 ```
 
-By default the app uses:
+Environment variables (see `.env.example`):
 
-```text
-https://policyengine--dashboard-builder-compute.modal.run
-```
+- `AXIOM_API_KEY` (required) — used by the proxy to authenticate to the Axiom
+  API. Never exposed to the browser.
+- `AXIOM_API_BASE` (optional) — override the upstream Axiom API base. Defaults
+  to `https://axiom-api-eta.vercel.app/v1`. Point it at a local API instance
+  (e.g. `http://localhost:8799/v1`) when testing unreleased endpoints.
 
-Override at build/dev time with:
+## Deployment (Vercel)
 
-```bash
-VITE_COMPUTE_URL=http://127.0.0.1:8787 pnpm dev
-```
+Set `AXIOM_API_KEY` (and optionally `AXIOM_API_BASE`) as a project environment
+variable. The `api/axiom/[...path].ts` function reads it at request time. The
+graph endpoint must be available on the deployed Axiom API.
