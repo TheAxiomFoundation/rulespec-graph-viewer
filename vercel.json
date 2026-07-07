@@ -1,8 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "functions": {
-    "api/axiom/[...path].ts": {
-      "maxDuration": 30
-    }
-  }
+  "rewrites": [
+    { "source": "/api/axiom/:path*", "destination": "/api/axiom" }
+  ]
 }
