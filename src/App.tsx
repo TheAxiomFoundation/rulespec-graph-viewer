@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { InteractiveRuleGraph } from "./InteractiveRuleGraph";
 import {
   countriesFromPrograms,
+  PREFERRED_DEFAULT_PROGRAM_KEY,
   countryLabel,
   countryOf,
   countryShortLabel,
@@ -73,8 +74,11 @@ export function App() {
       countryOf(program.jurisdiction) === country &&
       programs.some((item) => programKey(item) === programKey(program));
     if (!selectionValid) {
-      const first = programs[0];
-      setProgram(first ? programRefFromSummary(first) : null);
+      const preferred = programs.find(
+        (item) => programKey(item) === PREFERRED_DEFAULT_PROGRAM_KEY,
+      );
+      const next = preferred ?? programs[0];
+      setProgram(next ? programRefFromSummary(next) : null);
     }
   }, [allPrograms, countries, country, programs, program]);
 

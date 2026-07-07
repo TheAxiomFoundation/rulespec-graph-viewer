@@ -139,6 +139,25 @@ function jurisdictionLabel(jurisdiction: string): string {
   return jurisdiction.toUpperCase();
 }
 
+// Spelled-out names for known program ids. Cosmetic only — an id missing
+// here still renders via humanizeProgram, so new programs never need a
+// viewer change to appear.
+const PROGRAM_LABELS: Record<string, string> = {
+  snap: "SNAP",
+  tanf: "TANF",
+  tca: "Temporary Cash Assistance",
+  fiit: "Federal Income Tax",
+  scretd: "Senior Citizens Real Estate Tax Deferral",
+  "income-tax": "Income Tax",
+  "oasdi-wage-tax": "OASDI Wage Tax",
+  "universal-credit": "Universal Credit",
+  "medicaid-magi": "Medicaid MAGI",
+  ssi: "SSI",
+};
+
+// The program pre-selected on first load, when present in the registry.
+export const PREFERRED_DEFAULT_PROGRAM_KEY = "us-co/co-snap";
+
 // Turn a program id into a readable label, dropping a leading jurisdiction
 // segment when it just repeats the state (e.g. "co-snap" under "us-co").
 function programLabel(programId: string, jurisdiction: string): string {
@@ -147,7 +166,7 @@ function programLabel(programId: string, jurisdiction: string): string {
   if (stateCode && base.startsWith(`${stateCode}-`)) {
     base = base.slice(stateCode.length + 1);
   }
-  return humanizeProgram(base);
+  return PROGRAM_LABELS[base] ?? humanizeProgram(base);
 }
 
 function humanizeProgram(value: string): string {
