@@ -1,18 +1,25 @@
 export type LegalId = string;
-export type Country = "us" | "uk";
+// A country groups one or more jurisdictions (e.g. "us" covers "us-co",
+// "us-az"). Kept as an open string so new countries appear from the registry
+// with no code change.
+export type Country = string;
 
 export interface ProgramRef {
-  repo: string;
-  path: string;
+  jurisdiction: string;
+  programId: string;
   displayName?: string;
 }
 
 export interface ProgramSummary {
-  repo: string;
-  path: string;
-  kind: string;
-  name: string;
-  summary?: string;
+  jurisdiction: string;
+  programId: string;
+  runtimeId: string;
+  mode: string;
+  status: string;
+  defaultOutputs: LegalId[];
+  outputCount?: number;
+  entityCount?: number;
+  inputCount?: number;
 }
 
 export interface PeriodRef {
@@ -45,6 +52,7 @@ export interface TraceNode {
   value: number | string | boolean | null;
   dtype: "money" | "decimal" | "integer" | "boolean" | "date" | "judgment" | "string" | "input";
   source?: string;
+  sourceUrl?: string | null;
   formula?: string | null;
   inputSource?: "user" | "default";
   homeFile?: string;
@@ -74,6 +82,7 @@ export interface RuleNode {
   period: string | null;
   unit: string | null;
   source: string | null;
+  sourceUrl?: string | null;
   ruleDeps: string[];
   inputDeps: string[];
   relationDeps: string[];
@@ -109,6 +118,7 @@ export interface ParameterRule {
   name: string;
   fileLegalId: string;
   source?: string | null;
+  sourceUrl?: string | null;
   unit?: string | null;
   dtype?: string | null;
   formula?: string | null;
