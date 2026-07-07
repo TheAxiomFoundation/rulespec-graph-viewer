@@ -438,6 +438,9 @@ interface NodeMeta {
   kindLine: string;
   /** Humanized citation, e.g. "10 CCR 2506-1 § 4.207.3 (Colorado)". */
   citation?: string;
+  /** URL of the rule's primary legal source — when present, the citation
+   *  renders as a link to it. */
+  sourceUrl?: string | null;
   /** Full legal ID (mono, small) so power users can grep. */
   legalId: string;
   /** Deep link into the Axiom app's regulation viewer, if resolvable. */
@@ -653,7 +656,19 @@ const NodeInfo = ({
       {meta.formulaPreview && (
         <div className="irg-pop-formula">{meta.formulaPreview}</div>
       )}
-      {meta.citation && <div className="irg-pop-cite">{meta.citation}</div>}
+      {meta.citation &&
+        (meta.sourceUrl ? (
+          <a
+            className="irg-pop-cite irg-pop-cite-link"
+            href={meta.sourceUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {meta.citation} ↗
+          </a>
+        ) : (
+          <div className="irg-pop-cite">{meta.citation}</div>
+        ))}
       {meta.appUrl && (
         <a
           className="irg-pop-link"
@@ -1781,6 +1796,7 @@ function buildParameterMeta(p: ParameterRule): NodeMeta {
   return {
     kindLine: `Parameter${dtypeText}${p.unit ? ` · ${p.unit}` : ""}`,
     citation,
+    sourceUrl: p.sourceUrl ?? null,
     legalId: p.legalId,
     appUrl,
     parameterValue: valuePreview,
@@ -1806,6 +1822,7 @@ function buildMeta(t: TraceNode, kind: "Output" | "Input" | "Rule" | "Parameter"
   return {
     kindLine: `${friendly}${dtypeText}`,
     citation,
+    sourceUrl: t.sourceUrl ?? null,
     legalId: t.legalId,
     appUrl,
     parameterValue:

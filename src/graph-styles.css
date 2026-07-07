@@ -2756,6 +2756,17 @@ body, html, #root {
   margin-bottom: 4px;
   line-height: 1.4;
 }
+/* Citation as a link to the primary legal source. Keeps the serif
+   citation look; hover accent + arrow glyph signal clickability. */
+a.irg-pop-cite-link {
+  display: block;
+  text-decoration: none;
+  color: var(--color-ink-secondary);
+}
+a.irg-pop-cite-link:hover {
+  color: var(--color-accent-hover);
+  text-decoration: underline;
+}
 .irg-pop-legalid {
   font-family: var(--f-mono);
   font-size: 10.5px;

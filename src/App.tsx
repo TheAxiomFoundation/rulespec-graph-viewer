@@ -137,6 +137,7 @@ export function App() {
           name: rule.name,
           fileLegalId: rule.fileLegalId,
           source: rule.source,
+          sourceUrl: rule.sourceUrl,
           unit: rule.unit,
           dtype: rule.dtype,
           formula: rule.formula,
@@ -364,6 +365,7 @@ function buildStructureTraces(
         value: null,
         dtype: traceDtype(rule.dtype),
         source: rule.source ?? undefined,
+        sourceUrl: rule.sourceUrl ?? null,
         formula: rule.formula ?? null,
         children: [],
       };
