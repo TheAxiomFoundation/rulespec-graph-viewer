@@ -135,7 +135,24 @@ function toProgramSummary(pkg: ApiPackage): ProgramSummary {
   };
 }
 
+const US_STATE_NAMES: Record<string, string> = {
+  al: "Alabama", ak: "Alaska", az: "Arizona", ar: "Arkansas", ca: "California",
+  co: "Colorado", ct: "Connecticut", de: "Delaware", dc: "DC", fl: "Florida",
+  ga: "Georgia", hi: "Hawaii", id: "Idaho", il: "Illinois", in: "Indiana",
+  ia: "Iowa", ks: "Kansas", ky: "Kentucky", la: "Louisiana", me: "Maine",
+  md: "Maryland", ma: "Massachusetts", mi: "Michigan", mn: "Minnesota",
+  ms: "Mississippi", mo: "Missouri", mt: "Montana", ne: "Nebraska",
+  nv: "Nevada", nh: "New Hampshire", nj: "New Jersey", nm: "New Mexico",
+  ny: "New York", nc: "North Carolina", nd: "North Dakota", oh: "Ohio",
+  ok: "Oklahoma", or: "Oregon", pa: "Pennsylvania", ri: "Rhode Island",
+  sc: "South Carolina", sd: "South Dakota", tn: "Tennessee", tx: "Texas",
+  ut: "Utah", vt: "Vermont", va: "Virginia", wa: "Washington",
+  wv: "West Virginia", wi: "Wisconsin", wy: "Wyoming",
+};
+
 function jurisdictionLabel(jurisdiction: string): string {
+  const [country, region] = jurisdiction.split("-", 2);
+  if (country === "us" && region) return US_STATE_NAMES[region] ?? jurisdiction.toUpperCase();
   return jurisdiction.toUpperCase();
 }
 
