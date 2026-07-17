@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { InteractiveRuleGraph } from "./InteractiveRuleGraph";
 import {
   countriesFromPrograms,
@@ -26,6 +26,15 @@ export function App() {
   const [programsLoading, setProgramsLoading] = useState(true);
   const [loading, setLoading] = useState(false);
   const [outputSearch, setOutputSearch] = useState("");
+  // Deep-link params, consumed once: ?program=us-co/co-snap selects a
+  // program as soon as the registry loads; ?focus=us:statutes/7/2017
+  // pre-selects the rules whose fileLegalId sits at or under that
+  // prefix, so an external link (e.g. an Axiom app section page) lands
+  // on the subgraph for the provision the reader came from.
+  const [requestedProgramKey, setRequestedProgramKey] = useState<
+    string | null
+  >(() => initialParam("program"));
+  const pendingFocusRef = useRef<string | null>(initialParam("focus"));
 
   // Load the full program registry once; countries and the per-country program
   // list are derived from it, so a newly compiled program appears here with no
@@ -63,6 +72,20 @@ export function App() {
   // program when none is selected.
   useEffect(() => {
     if (allPrograms.length === 0) return;
+    // A ?program= deep link wins once, as soon as the registry can
+    // resolve it; the country snaps to the program's.
+    if (requestedProgramKey) {
+      const requested = allPrograms.find(
+        (item) => programKey(item) === requestedProgramKey,
+      );
+      setRequestedProgramKey(null);
+      if (requested) {
+        const requestedCountry = countryOf(requested.jurisdiction);
+        if (requestedCountry !== country) setCountry(requestedCountry);
+        setProgram(programRefFromSummary(requested));
+        return;
+      }
+    }
     if (!countries.includes(country)) {
       // Unknown country (bad ?country= param, or a country that lost its last
       // program): prefer US, else the first available.
@@ -80,7 +103,7 @@ export function App() {
       const next = preferred ?? programs[0];
       setProgram(next ? programRefFromSummary(next) : null);
     }
-  }, [allPrograms, countries, country, programs, program]);
+  }, [allPrograms, countries, country, programs, program, requestedProgramKey]);
 
   useEffect(() => {
     if (!program) return;
@@ -92,6 +115,20 @@ export function App() {
         if (cancelled) return;
         setGraph(nextGraph);
         setSelectedOutputs((current) => {
+          const focus = pendingFocusRef.current;
+          if (focus) {
+            const matched = nextGraph.rules
+              .filter(
+                (rule) =>
+                  rule.fileLegalId === focus ||
+                  rule.fileLegalId.startsWith(`${focus}/`),
+              )
+              .map((rule) => rule.legalId);
+            if (matched.length > 0) {
+              pendingFocusRef.current = null;
+              return matched.slice(0, 24);
+            }
+          }
           const legalIds = new Set(nextGraph.rules.map((rule) => rule.legalId));
           const retained = current.filter((id) => legalIds.has(id));
           if (retained.length > 0) return retained;
@@ -497,6 +534,12 @@ function humanize(value: string): string {
 function initialCountry(): Country {
   if (typeof window === "undefined") return "us";
   return new URL(window.location.href).searchParams.get("country") ?? "us";
+}
+
+function initialParam(name: string): string | null {
+  if (typeof window === "undefined") return null;
+  const value = new URL(window.location.href).searchParams.get(name);
+  return value && value.trim().length > 0 ? value.trim() : null;
 }
 
 function syncCountryToUrl(country: Country) {
