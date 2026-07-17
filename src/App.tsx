@@ -117,13 +117,19 @@ export function App() {
         setSelectedOutputs((current) => {
           const focus = pendingFocusRef.current;
           if (focus) {
-            const matched = nextGraph.rules
-              .filter(
-                (rule) =>
-                  rule.fileLegalId === focus ||
-                  rule.fileLegalId.startsWith(`${focus}/`),
-              )
-              .map((rule) => rule.legalId);
+            // "us:statutes/7/2017/a#rule_name" targets one rule;
+            // without the fragment it's a file/section prefix.
+            const matched = focus.includes("#")
+              ? nextGraph.rules
+                  .filter((rule) => rule.legalId === focus)
+                  .map((rule) => rule.legalId)
+              : nextGraph.rules
+                  .filter(
+                    (rule) =>
+                      rule.fileLegalId === focus ||
+                      rule.fileLegalId.startsWith(`${focus}/`),
+                  )
+                  .map((rule) => rule.legalId);
             if (matched.length > 0) {
               pendingFocusRef.current = null;
               return matched.slice(0, 24);
