@@ -9,6 +9,7 @@ import {
   defaultOutputsForProgram,
   displayNameForProgram,
   fetchAllPrograms,
+  fetchComposedGraph,
   fetchProgramGraph,
   programKey,
   programRefFromSummary,
@@ -35,6 +36,15 @@ export function App() {
     string | null
   >(() => initialParam("program"));
   const pendingFocusRef = useRef<string | null>(initialParam("focus"));
+  // ?compose=us:regulations/47-cfr/54/403[#rule] renders a graph composed
+  // on demand from the encodings mirror — for law that is encoded but not
+  // yet inside any compiled program package. Choosing a program or
+  // country exits compose mode back to the package registry.
+  const [composeFocus, setComposeFocus] = useState<string | null>(() =>
+    initialParam("compose"),
+  );
+  const [composedFiles, setComposedFiles] = useState<LegalId[]>([]);
+  const [composedTruncated, setComposedTruncated] = useState(false);
 
   // Load the full program registry once; countries and the per-country program
   // list are derived from it, so a newly compiled program appears here with no
@@ -71,6 +81,9 @@ export function App() {
   // country changes: snap to an existing country, then default to its first
   // program when none is selected.
   useEffect(() => {
+    // Compose mode owns the graph; don't auto-select a package program
+    // underneath it.
+    if (composeFocus) return;
     if (allPrograms.length === 0) return;
     // A ?program= deep link wins once, as soon as the registry can
     // resolve it; the country snaps to the program's.
@@ -103,7 +116,7 @@ export function App() {
       const next = preferred ?? programs[0];
       setProgram(next ? programRefFromSummary(next) : null);
     }
-  }, [allPrograms, countries, country, programs, program, requestedProgramKey]);
+  }, [allPrograms, countries, country, programs, program, requestedProgramKey, composeFocus]);
 
   useEffect(() => {
     if (!program) return;
@@ -152,7 +165,47 @@ export function App() {
     };
   }, [program]);
 
-  const outputRules = useMemo(() => rankOutputRules(graph), [graph]);
+  // Compose mode: fetch the on-demand graph for the focus legal id. The
+  // server narrows ownOutputs to the focus rule when a #fragment is given.
+  useEffect(() => {
+    if (!composeFocus) return;
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    fetchComposedGraph(composeFocus)
+      .then((composed) => {
+        if (cancelled) return;
+        setGraph(composed.graph);
+        setComposedFiles(composed.files);
+        setComposedTruncated(composed.truncated);
+        const rulesById = new Map(
+          composed.graph.rules.map((rule) => [rule.legalId, rule]),
+        );
+        // Prefer outputs with a real computation to draw; fall back to
+        // everything the focus file declares (a parameter-only section
+        // still renders its nodes).
+        const own = composed.graph.ownOutputs.filter((id) => rulesById.has(id));
+        const derived = own.filter((id) => {
+          const rule = rulesById.get(id);
+          return rule?.kind === "derived" && rule.formula?.trim();
+        });
+        setSelectedOutputs((derived.length > 0 ? derived : own).slice(0, 24));
+      })
+      .catch((err) => {
+        if (!cancelled) setError(String(err));
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [composeFocus]);
+
+  const outputRules = useMemo(
+    () => rankOutputRules(graph, { includeLeaves: composeFocus != null }),
+    [graph, composeFocus],
+  );
   const filteredOutputRules = useMemo(() => {
     const query = outputSearch.trim().toLowerCase();
     if (!query) return outputRules;
@@ -187,15 +240,27 @@ export function App() {
         })),
     [graph],
   );
+  // In compose mode there is no registry program; a synthetic ref keeps
+  // the header and dashboard spec coherent.
+  const composedProgram = useMemo<ProgramRef | null>(() => {
+    if (!composeFocus) return null;
+    return {
+      jurisdiction: composeFocus.split(":")[0] ?? "us",
+      programId: "composed",
+      displayName: composeFocus.split("#")[0] ?? composeFocus,
+    };
+  }, [composeFocus]);
+  const effectiveProgram = program ?? composedProgram;
+
   const spec = useMemo<DashboardSpec | null>(
     () =>
-      program
+      effectiveProgram
         ? {
             specVersion: "0.1",
             meta: {
-              title: program.displayName ?? program.programId,
+              title: effectiveProgram.displayName ?? effectiveProgram.programId,
             },
-            program,
+            program: effectiveProgram,
             period: { kind: "month", start: "2026-01-01" },
             inputs: [],
             outputs: selectedOutputs.map((legalId) => ({
@@ -205,7 +270,7 @@ export function App() {
             })),
           }
         : null,
-    [graph, program, selectedOutputs],
+    [graph, effectiveProgram, selectedOutputs],
   );
 
   const selectedSet = useMemo(() => new Set(selectedOutputs), [selectedOutputs]);
@@ -230,16 +295,32 @@ export function App() {
     );
   }
 
+  // Leaving compose mode: clear the composed graph and the ?compose=
+  // param so the registry-driven selection takes over again.
+  function exitComposeMode() {
+    if (!composeFocus) return;
+    setComposeFocus(null);
+    setComposedFiles([]);
+    setComposedTruncated(false);
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("compose");
+      window.history.replaceState({}, "", url.toString());
+    }
+  }
+
   function selectProgram(value: string) {
     const next = programs.find((item) => programKey(item) === value);
     if (!next) return;
+    exitComposeMode();
     setProgram(programRefFromSummary(next));
     setGraph(null);
     setSelectedOutputs([]);
   }
 
   function selectCountry(nextCountry: Country) {
-    if (nextCountry === country) return;
+    if (nextCountry === country && !composeFocus) return;
+    exitComposeMode();
     setCountry(nextCountry);
     // The selection effect picks the first program of the new country.
     setProgram(null);
@@ -276,7 +357,10 @@ export function App() {
               onChange={(event) => selectProgram(event.target.value)}
               disabled={programs.length === 0}
             >
-              {programs.length === 0 && <option value="">No programs available</option>}
+              {composeFocus && <option value="">Composed view</option>}
+              {programs.length === 0 && !composeFocus && (
+                <option value="">No programs available</option>
+              )}
               {programs.map((item) => (
                 <option key={programKey(item)} value={programKey(item)}>
                   {displayNameForProgram(item)}
@@ -285,6 +369,14 @@ export function App() {
             </select>
           </label>
           {program && <p className="program-summary">{summaryForProgram(programs, program)}</p>}
+          {composeFocus && (
+            <p className="program-summary">
+              Composed on demand from {composedFiles.length || "the"} encoded{" "}
+              {composedFiles.length === 1 ? "file" : "files"}
+              {composedTruncated ? " (import walk truncated)" : ""}. Pick a
+              program above to return to compiled packages.
+            </p>
+          )}
         </section>
 
         <section className="control-block outputs-control">
@@ -339,8 +431,8 @@ export function App() {
       <section className="viewer-panel">
         <header className="viewer-header">
           <div>
-            <p>{program?.jurisdiction ?? ""}</p>
-            <h1>{program?.displayName ?? "RuleSpec program"}</h1>
+            <p>{composeFocus ? "composed view" : effectiveProgram?.jurisdiction ?? ""}</p>
+            <h1>{effectiveProgram?.displayName ?? "RuleSpec program"}</h1>
           </div>
           <div className="country-toggle" role="tablist" aria-label="Country">
             {countries.map((option) => (
@@ -497,11 +589,18 @@ function scalarSample(value: unknown): TraceNode["value"] {
   return null;
 }
 
-function rankOutputRules(graph: ProgramGraph | null): RuleNode[] {
+function rankOutputRules(
+  graph: ProgramGraph | null,
+  options: { includeLeaves?: boolean } = {},
+): RuleNode[] {
   if (!graph) return [];
   const terminal = new Set(graph.terminalOutputs);
   return graph.rules
-    .filter(isGraphableOutputRule)
+    // Composed graphs are views of partial encodings, where a rule with
+    // no resolved deps (a leaf constant) is still worth selecting.
+    .filter((rule) =>
+      options.includeLeaves ? Boolean(rule.formula?.trim()) : isGraphableOutputRule(rule),
+    )
     .map((rule) => ({
       rule,
       score:

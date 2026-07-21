@@ -81,6 +81,34 @@ export async function fetchProgramGraph(program: ProgramRef): Promise<ProgramGra
   return json.data.graph;
 }
 
+export interface ComposedGraph {
+  graph: ProgramGraph;
+  files: LegalId[];
+  truncated: boolean;
+}
+
+// Compose-on-demand graph for any encoded rule or file (no compiled
+// package required). `focus` is a file or rule legal id, e.g.
+// "us:regulations/47-cfr/54/403" or "…#basic_lifeline_support_amount".
+export async function fetchComposedGraph(focus: string): Promise<ComposedGraph> {
+  const url = `${trimSlash(API_BASE)}/graph/compose?focus=${encodeURIComponent(focus)}`;
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`compose request failed (${response.status}): ${await response.text()}`);
+  }
+  const json = (await response.json()) as {
+    data?: { graph?: ProgramGraph; files?: LegalId[]; truncated?: boolean };
+  };
+  if (!json.data?.graph) {
+    throw new Error("compose response missing data.graph");
+  }
+  return {
+    graph: json.data.graph,
+    files: json.data.files ?? [],
+    truncated: json.data.truncated ?? false,
+  };
+}
+
 export function displayNameForProgram(program: ProgramSummary | ProgramRef): string {
   if ("displayName" in program && program.displayName) return program.displayName;
   return `${jurisdictionLabel(program.jurisdiction)} ${programLabel(program.programId, program.jurisdiction)}`;
