@@ -13,8 +13,11 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
-  // Everything after /api/axiom, preserving the query string.
-  const suffix = req.url.replace(/^\/api\/axiom/, "");
+  // Everything after /api/axiom, preserving the query string. Vercel hands the
+  // function the original request URL, so tolerate the public /graph-viewer
+  // prefix (the app is served under axiom.org/graph-viewer and calls
+  // /graph-viewer/api/axiom/*, rewritten to this function by vercel.json).
+  const suffix = req.url.replace(/^(?:\/graph-viewer)?\/api\/axiom/, "");
   const upstreamUrl = `${UPSTREAM_BASE.replace(/\/+$/, "")}${suffix}`;
 
   const init: Record<string, unknown> = {
