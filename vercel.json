@@ -6,6 +6,7 @@
   "rewrites": [
     { "source": "/graph-viewer/api/:path*", "destination": "/api/:path*" },
     { "source": "/api/axiom/:path*", "destination": "/api/axiom" },
+    { "source": "/graph-viewer/", "destination": "/index.html" },
     { "source": "/graph-viewer/:path*", "destination": "/:path*" }
   ]
 }
