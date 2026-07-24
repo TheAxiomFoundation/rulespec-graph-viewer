@@ -334,7 +334,12 @@ export function App() {
     <main className="app-shell">
       <aside className="side-panel">
         <div className="brand">
-          <span>Axiom</span>
+          {/* Settled brand lockup (w350, outlined paths) — never a live-font wordmark. */}
+          <img
+            className="brand-wordmark"
+            src="/axiom-foundation.svg"
+            alt="Axiom Foundation"
+          />
           <strong>Rule Graph</strong>
           <p>Explore the structure of a RuleSpec computation without the dashboard builder workflow.</p>
         </div>

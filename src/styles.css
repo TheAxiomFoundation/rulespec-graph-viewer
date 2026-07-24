@@ -77,12 +77,12 @@ textarea {
   border-bottom: 1px solid #e1dad3;
 }
 
-.brand span {
-  color: #8b431f;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+/* Outlined-path Axiom Foundation lockup (settled w350 render); replaces the
+   old CSS-typed "AXIOM" eyebrow. Wordmark is never rendered with a live font. */
+.brand-wordmark {
+  display: block;
+  width: 102px;
+  height: auto;
 }
 
 .brand strong {
