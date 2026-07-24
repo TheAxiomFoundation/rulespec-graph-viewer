@@ -337,7 +337,7 @@ export function App() {
           {/* Settled brand lockup (w350, outlined paths) — never a live-font wordmark. */}
           <img
             className="brand-wordmark"
-            src="/axiom-foundation.svg"
+            src={`${import.meta.env.BASE_URL}axiom-foundation.svg`}
             alt="Axiom Foundation"
           />
           <strong>Rule Graph</strong>

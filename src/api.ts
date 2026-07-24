@@ -10,7 +10,10 @@ import type {
 // locally, a Vercel function in production) that injects the Axiom API key
 // server-side. The browser never sees the key and there is no cross-origin
 // request, so no CORS dependency. Override the proxy base only for testing.
-export const API_BASE = import.meta.env.VITE_AXIOM_API_BASE ?? "/api/axiom";
+// BASE_URL is "/graph-viewer/" (vite.config base), so the default resolves to
+// "/graph-viewer/api/axiom" in both dev and production.
+export const API_BASE =
+  import.meta.env.VITE_AXIOM_API_BASE ?? `${import.meta.env.BASE_URL}api/axiom`;
 
 // Friendly country labels. Any jurisdiction whose prefix is missing here falls
 // back to the upper-cased prefix, so a new country still renders — the map is
