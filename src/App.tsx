@@ -334,14 +334,28 @@ export function App() {
     <main className="app-shell">
       <aside className="side-panel">
         <div className="brand">
-          {/* Settled brand lockup (w350, outlined paths) — never a live-font wordmark. */}
-          <img
-            className="brand-wordmark"
-            src={`${import.meta.env.BASE_URL}axiom-foundation.svg`}
-            alt="Axiom Foundation"
-          />
-          <strong>Rule Graph</strong>
+          <div className="brand-lockup">
+            {/* Settled brand lockup (w350, outlined paths) — never a live-font wordmark. */}
+            <a
+              className="brand-logo"
+              href="https://axiom-foundation.org"
+              aria-label="Axiom Foundation"
+            >
+              <img
+                className="brand-wordmark"
+                src={`${import.meta.env.BASE_URL}axiom-foundation.svg`}
+                alt="Axiom Foundation"
+              />
+            </a>
+            <a className="brand-title" href={import.meta.env.BASE_URL}>
+              <span className="brand-eyebrow">Interactive</span>
+              <strong>Graph viewer</strong>
+            </a>
+          </div>
           <p>Explore the structure of a RuleSpec computation without the dashboard builder workflow.</p>
+          <a className="all-demos-link" href="https://axiom.org/demos">
+            All demos
+          </a>
         </div>
 
         <section className="control-block program-controls">
