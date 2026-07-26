@@ -98,20 +98,11 @@ textarea {
 
 .brand-title {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  align-items: center;
   padding-left: 12px;
   border-left: 1px solid #e1dad3;
   color: inherit;
   text-decoration: none;
-}
-
-.brand-eyebrow {
-  font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  font-size: 10px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: #625b53;
 }
 
 .brand strong {

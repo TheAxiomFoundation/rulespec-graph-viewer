@@ -348,7 +348,6 @@ export function App() {
               />
             </a>
             <a className="brand-title" href={import.meta.env.BASE_URL}>
-              <span className="brand-eyebrow">Interactive</span>
               <strong>Graph viewer</strong>
             </a>
           </div>
