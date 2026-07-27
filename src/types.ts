@@ -54,6 +54,7 @@ export interface TraceNode {
   source?: string;
   sourceUrl?: string | null;
   formula?: string | null;
+  certificateId?: string;
   inputSource?: "user" | "default";
   homeFile?: string;
   children?: TraceNode[];
@@ -87,6 +88,9 @@ export interface RuleNode {
   inputDeps: string[];
   relationDeps: string[];
   formula?: string | null;
+  // Set on nodes served from a certified release; the API only serves
+  // certified nodes, so this is provenance, not a gate.
+  certificateId?: string;
 }
 
 export interface InputNode {
@@ -122,4 +126,5 @@ export interface ParameterRule {
   unit?: string | null;
   dtype?: string | null;
   formula?: string | null;
+  certificateId?: string;
 }

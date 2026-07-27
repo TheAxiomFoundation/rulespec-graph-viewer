@@ -450,6 +450,8 @@ interface NodeMeta {
   formulaPreview?: string;
   /** For parameters: the constant value or expression backing the parameter. */
   parameterValue?: string;
+  /** Certification id of the served node, when the API provides one. */
+  certificateId?: string;
 }
 
 type IrgNodeData =
@@ -669,6 +671,12 @@ const NodeInfo = ({
         ) : (
           <div className="irg-pop-cite">{meta.citation}</div>
         ))}
+      {meta.certificateId && (
+        <div className="irg-pop-value">
+          <span>Certificate</span>
+          <strong>{meta.certificateId}</strong>
+        </div>
+      )}
       {meta.appUrl && (
         <a
           className="irg-pop-link"
@@ -1800,6 +1808,7 @@ function buildParameterMeta(p: ParameterRule): NodeMeta {
     legalId: p.legalId,
     appUrl,
     parameterValue: valuePreview,
+    certificateId: p.certificateId,
   };
 }
 
@@ -1829,6 +1838,7 @@ function buildMeta(t: TraceNode, kind: "Output" | "Input" | "Rule" | "Parameter"
       kind === "Parameter" && t.formula
         ? truncate(t.formula.replace(/\s+/g, " ").trim(), 140)
         : undefined,
+    certificateId: t.certificateId,
   };
 }
 

@@ -192,7 +192,9 @@ export function App() {
         setSelectedOutputs((derived.length > 0 ? derived : own).slice(0, 24));
       })
       .catch((err) => {
-        if (!cancelled) setError(String(err));
+        // fetchComposedGraph maps the API's uncertified_node 404 to a
+        // human message; show it bare instead of an "Error:" wrapper.
+        if (!cancelled) setError(err instanceof Error ? err.message : String(err));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -237,6 +239,7 @@ export function App() {
           unit: rule.unit,
           dtype: rule.dtype,
           formula: rule.formula,
+          certificateId: rule.certificateId,
         })),
     [graph],
   );
@@ -459,6 +462,12 @@ export function App() {
               <span className="loading-spinner" aria-hidden="true" />
               <span>Loading graph...</span>
             </div>
+          ) : graph && graph.rules.length === 0 ? (
+            // The API serves only certified nodes, so an empty rules list is
+            // a legitimate answer, not a failure.
+            <div className="empty-state">
+              Nothing certified yet for this program — awaiting the certification sweep.
+            </div>
           ) : spec && Object.keys(structureTraces).length > 0 ? (
             <InteractiveRuleGraph
               spec={spec}
@@ -502,6 +511,7 @@ function buildStructureTraces(
         source: rule.source ?? undefined,
         sourceUrl: rule.sourceUrl ?? null,
         formula: rule.formula ?? null,
+        certificateId: rule.certificateId,
         children: [],
       };
       cache.set(legalId, trace);

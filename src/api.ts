@@ -94,7 +94,13 @@ export async function fetchComposedGraph(focus: string): Promise<ComposedGraph> 
   const url = `${trimSlash(API_BASE)}/graph/compose?focus=${encodeURIComponent(focus)}`;
   const response = await fetch(url);
   if (!response.ok) {
-    throw new Error(`compose request failed (${response.status}): ${await response.text()}`);
+    const body = await response.text();
+    // The API serves only certified nodes; a 404 with this code means the
+    // focus resolves but nothing under it has been certified yet.
+    if (response.status === 404 && errorCodeOf(body) === "uncertified_node") {
+      throw new Error("Nothing certified is servable for this focus.");
+    }
+    throw new Error(`compose request failed (${response.status}): ${body}`);
   }
   const json = (await response.json()) as {
     data?: { graph?: ProgramGraph; files?: LegalId[]; truncated?: boolean };
@@ -221,6 +227,15 @@ function humanizeProgram(value: string): string {
     .filter(Boolean)
     .map((word) => (acronyms.has(word) ? word.toUpperCase() : word.charAt(0).toUpperCase() + word.slice(1)))
     .join(" ");
+}
+
+function errorCodeOf(body: string): string | null {
+  try {
+    const json = JSON.parse(body) as { error?: { code?: string } };
+    return json.error?.code ?? null;
+  } catch {
+    return null;
+  }
 }
 
 function trimSlash(value: string): string {
