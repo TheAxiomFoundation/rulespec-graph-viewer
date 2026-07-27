@@ -55,6 +55,8 @@ export interface TraceNode {
   sourceUrl?: string | null;
   formula?: string | null;
   certificateId?: string;
+  certificationStatus?: string;
+  incompleteByDeclaration?: boolean;
   inputSource?: "user" | "default";
   homeFile?: string;
   children?: TraceNode[];
@@ -88,9 +90,11 @@ export interface RuleNode {
   inputDeps: string[];
   relationDeps: string[];
   formula?: string | null;
-  // Set on nodes served from a certified release; the API only serves
-  // certified nodes, so this is provenance, not a gate.
+  // Set on nodes served from a certified release.
   certificateId?: string;
+  // Launch taxonomy: certification is a status, not a gate.
+  certificationStatus?: string;
+  incompleteByDeclaration?: boolean;
 }
 
 export interface InputNode {
@@ -127,4 +131,6 @@ export interface ParameterRule {
   dtype?: string | null;
   formula?: string | null;
   certificateId?: string;
+  certificationStatus?: string;
+  incompleteByDeclaration?: boolean;
 }

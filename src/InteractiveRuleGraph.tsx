@@ -452,6 +452,9 @@ interface NodeMeta {
   parameterValue?: string;
   /** Certification id of the served node, when the API provides one. */
   certificateId?: string;
+  /** Launch taxonomy status: certified | validated | encoded | pending. */
+  certificationStatus?: string;
+  incompleteByDeclaration?: boolean;
 }
 
 type IrgNodeData =
@@ -671,6 +674,22 @@ const NodeInfo = ({
         ) : (
           <div className="irg-pop-cite">{meta.citation}</div>
         ))}
+      {meta.certificationStatus && (
+        <div className="irg-pop-value">
+          <span>Status</span>
+          <strong>
+            {meta.certificationStatus === "certified"
+              ? "Certified"
+              : meta.certificationStatus === "validated"
+                ? "Validated, not certified"
+                : meta.certificationStatus === "pending"
+                  ? "Pending — not yet encoded"
+                  : meta.incompleteByDeclaration
+                    ? "Encoded, incomplete by declaration"
+                    : "Encoded"}
+          </strong>
+        </div>
+      )}
       {meta.certificateId && (
         <div className="irg-pop-value">
           <span>Certificate</span>
@@ -1809,6 +1828,8 @@ function buildParameterMeta(p: ParameterRule): NodeMeta {
     appUrl,
     parameterValue: valuePreview,
     certificateId: p.certificateId,
+    certificationStatus: p.certificationStatus,
+    incompleteByDeclaration: p.incompleteByDeclaration,
   };
 }
 
@@ -1839,6 +1860,8 @@ function buildMeta(t: TraceNode, kind: "Output" | "Input" | "Rule" | "Parameter"
         ? truncate(t.formula.replace(/\s+/g, " ").trim(), 140)
         : undefined,
     certificateId: t.certificateId,
+    certificationStatus: t.certificationStatus,
+    incompleteByDeclaration: t.incompleteByDeclaration,
   };
 }
 

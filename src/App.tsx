@@ -240,6 +240,8 @@ export function App() {
           dtype: rule.dtype,
           formula: rule.formula,
           certificateId: rule.certificateId,
+          certificationStatus: rule.certificationStatus,
+          incompleteByDeclaration: rule.incompleteByDeclaration,
         })),
     [graph],
   );
@@ -512,6 +514,8 @@ function buildStructureTraces(
         sourceUrl: rule.sourceUrl ?? null,
         formula: rule.formula ?? null,
         certificateId: rule.certificateId,
+        certificationStatus: rule.certificationStatus,
+        incompleteByDeclaration: rule.incompleteByDeclaration,
         children: [],
       };
       cache.set(legalId, trace);
