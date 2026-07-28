@@ -5,6 +5,7 @@ import type {
   ProgramRef,
   ProgramSummary,
 } from "./types";
+import { humanizeRuleName } from "./citations";
 
 // All API traffic goes through a same-origin proxy (Vite dev-server proxy
 // locally, a Vercel function in production) that injects the Axiom API key
@@ -218,12 +219,7 @@ function programLabel(programId: string, jurisdiction: string): string {
 }
 
 function humanizeProgram(value: string): string {
-  const acronyms = new Set(["snap", "tanf", "wic", "ssi", "eitc", "ctc", "uc"]);
-  return value
-    .split(/[-_]/)
-    .filter(Boolean)
-    .map((word) => (acronyms.has(word) ? word.toUpperCase() : word.charAt(0).toUpperCase() + word.slice(1)))
-    .join(" ");
+  return humanizeRuleName(value);
 }
 
 function trimSlash(value: string): string {

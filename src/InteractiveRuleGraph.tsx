@@ -25,7 +25,7 @@ import {
   type AstNode,
   type EvalValue,
 } from "./formula";
-import { axiomAppUrl, fileLegalIdOf, humanizeCitation } from "./citations";
+import { axiomAppUrl, fileLegalIdOf, humanizeCitation, humanizeRuleName } from "./citations";
 
 interface Props {
   spec: DashboardSpec;
@@ -692,14 +692,14 @@ const NodeInfo = ({
  */
 /**
  * Convert a snake_case identifier into a human-readable label —
- * "snap_household_size" → "Snap household size". Used for every label
+ * "snap_household_size" → "SNAP Household Size". Used for every label
  * the graph renders so non-engineers don't have to read raw RuleSpec
  * identifiers. The raw legal-id is still available on hover via the
  * info popover.
  */
 function humanizeLabel(s: string): string {
   if (!s) return s;
-  return s.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  return humanizeRuleName(s);
 }
 
 function softBreak(s: string): string {
