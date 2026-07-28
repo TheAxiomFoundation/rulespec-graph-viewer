@@ -15,6 +15,7 @@ import {
   programRefFromSummary,
   summaryForProgram,
 } from "./api";
+import { humanizeRuleName } from "./citations";
 import type { Country, DashboardSpec, LegalId, ParameterRule, ProgramGraph, ProgramRef, ProgramSummary, RuleNode, TraceNode } from "./types";
 
 export function App() {
@@ -647,11 +648,11 @@ function labelForRule(graph: ProgramGraph | null, legalId: LegalId): string {
 }
 
 function humanize(value: string): string {
-  return value
-    .replace(/^snap_/, "")
-    .replace(/^universal_credit_/, "UC ")
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (char) => char.toUpperCase());
+  return humanizeRuleName(
+    value
+      .replace(/^snap_/, "")
+      .replace(/^universal_credit_/, "UC "),
+  );
 }
 
 function initialCountry(): Country {
