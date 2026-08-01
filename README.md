@@ -47,3 +47,18 @@ Environment variables (see `.env.example`):
 Set `AXIOM_API_KEY` (and optionally `AXIOM_API_BASE`) as a project environment
 variable. The `api/axiom/[...path].ts` function reads it at request time. The
 graph endpoint must be available on the deployed Axiom API.
+
+## Relationship to axiom.org
+
+[axiom.org](https://github.com/TheAxiomFoundation/axiom.org) carries a scoped
+copy of this viewer under `src/components/axiom/graph-viewer/` (its
+`graph-styles.css` header records the copy). There is no automated sync in
+either direction, and the copies have already diverged
+(`InteractiveRuleGraph.tsx` differs between the repos; the site copy adds
+site-only modules like `viewer-app.tsx` and `inspector-mini-graph.tsx`, and
+drops this repo's `App.tsx`/`main.tsx` shell).
+
+A fix to shared behavior — `api.ts`, `citations.ts`, `formula.ts`,
+`types.ts`, `graph-styles.css`, `InteractiveRuleGraph.tsx` — lands in
+**both** repos, as two PRs, or it quietly holds in only one. Tracking:
+[#17](https://github.com/TheAxiomFoundation/rulespec-graph-viewer/issues/17).
