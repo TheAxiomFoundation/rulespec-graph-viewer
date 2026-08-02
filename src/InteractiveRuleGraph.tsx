@@ -1468,7 +1468,7 @@ function walkAst(node: AstNode, parentScope: string, opPath: string, ctx: WalkCt
 
     case "call": {
       const value = evalAst(node, lookupValue);
-      const cls = ["any", "all"].includes(node.name) ? verdictClassOfBool(value) : "rg-numeric";
+      const cls = ["any", "all", "exactly_one"].includes(node.name) ? verdictClassOfBool(value) : "rg-numeric";
       const myKey = `op:${parentScope}:${opPath}:call:${node.name}`;
       const myId = ensureNode(ctx, myKey, {
         type: "operator",
