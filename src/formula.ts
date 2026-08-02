@@ -359,6 +359,13 @@ export function evalAst(
           return args.every((a) => typeof a === "number")
             ? Math.max(...(args as number[]))
             : null;
+        case "exactly_one":
+          // Judgment gate: holds when exactly one argument holds. Strict on
+          // types like min/max — anything non-boolean means the engine's
+          // trace, not us, owns the verdict.
+          return args.every((a) => typeof a === "boolean")
+            ? (args as boolean[]).filter(Boolean).length === 1
+            : null;
         case "abs":
           return typeof args[0] === "number" ? Math.abs(args[0]) : null;
         case "round":
