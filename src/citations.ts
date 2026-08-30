@@ -77,7 +77,12 @@ function normalizeAxiomAppSegments(
 }
 
 /** Acronyms that must stay upper-case when a snake_case rule name is
- *  humanized ("cdcc" → "CDCC", "snap_agi_limit" → "SNAP AGI Limit"). */
+ *  humanized ("cdcc" → "CDCC", "snap_agi_limit" → "SNAP AGI Limit").
+ *  Hand-synced mirror of the site's shared registry — when adding a token
+ *  here, add it to `DISPLAY_ACRONYMS` in axiom-foundation.org
+ *  `src/lib/display-acronyms.ts` too (a superset consolidated across all
+ *  of the site's humanizers; convention in axiom-rules-engine
+ *  docs/concept-naming.md §Acronyms). */
 const RULE_NAME_ACRONYMS = new Set([
   "cdcc", "snap", "tanf", "wic", "ssi", "eitc", "ctc", "agi", "magi",
   "cola", "usda", "irs", "fpl", "abawd", "uc", "dcf", "dss", "hhs",
