@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import viteConfig from "../vite.config";
-import { proxyAllowlist, proxyGuard } from "../dev/proxy-guard";
+import { PROXY_PREFIX, proxyAllowlist, proxyGuard } from "../dev/proxy-guard";
 
 function response() {
   const headers: Record<string, string> = {};
@@ -64,12 +64,16 @@ describe("dev proxy guard", () => {
     }
   });
 
-  it("is part of the Vite config", () => {
-    const config = (viteConfig as (env: { mode: string; command: "serve" }) => { plugins: unknown[] })({
-      mode: "test",
-      command: "serve",
-    });
+  it("is part of the Vite config, and guards every path the proxy covers", () => {
+    const config = (viteConfig as (env: { mode: string; command: "serve" }) => {
+      plugins: unknown[];
+      server: { proxy: Record<string, unknown> };
+    })({ mode: "test", command: "serve" });
     const names = config.plugins.flat(Infinity).map((plugin) => (plugin as { name?: string } | null)?.name);
     expect(names).toContain("viewer-proxy-allowlist");
+    // Every proxied prefix must fall under the guard's prefix.
+    for (const key of Object.keys(config.server.proxy)) {
+      expect(key.startsWith(PROXY_PREFIX), key).toBe(true);
+    }
   });
 });

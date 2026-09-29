@@ -1,6 +1,6 @@
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
-import { proxyAllowlist } from "./dev/proxy-guard";
+import { PROXY_PREFIX, proxyAllowlist } from "./dev/proxy-guard";
 
 // The viewer talks to the Axiom API only through a same-origin proxy so the
 // API key stays server-side and there is no CORS dependency. In dev, Vite's
@@ -21,10 +21,12 @@ export default defineConfig(({ mode }) => {
     plugins: [react(), proxyAllowlist()],
     server: {
       proxy: {
-        "/graph-viewer/api/axiom": {
+        // One constant for the proxy and its guard, so the proxy can never
+        // cover a path the guard does not inspect.
+        [PROXY_PREFIX]: {
           target: upstream,
           changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/graph-viewer\/api\/axiom/, ""),
+          rewrite: (path) => path.slice(PROXY_PREFIX.length),
           headers: apiKey ? { "x-api-key": apiKey } : undefined,
         },
       },

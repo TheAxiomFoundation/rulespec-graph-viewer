@@ -21,7 +21,8 @@ browser ──/api/axiom/*──▶ same-origin proxy ──x-api-key──▶ A
 - The browser only ever makes **same-origin** requests to `/api/axiom/*`. A
   proxy forwards them to the Axiom API and injects the API key server-side, so
   the key never reaches the browser bundle and there is no CORS dependency.
-  - Local dev and `pnpm preview`: the Vite proxy (`vite.config.ts`).
+  - Local dev and `pnpm preview`: the Vite proxy (`vite.config.ts`), behind
+    the same allowlist (`dev/proxy-guard.ts`).
   - Production: a Vercel function (`api/axiom.ts`).
 - The proxy forwards **only the reads the viewer makes**: `GET`/`HEAD` of
   `runtime/packages`, `runtime/packages/{jurisdiction}/{program_id}/graph`,
