@@ -3,6 +3,11 @@
 // bundle, and so the viewer makes only same-origin requests (no CORS).
 //
 // GET /api/axiom/runtime/packages -> GET {AXIOM_API_BASE}/runtime/packages
+//
+// Only the reads the viewer makes are forwarded (see ./_upstream.ts); the key
+// behind this proxy must never be lent to arbitrary paths or methods.
+
+import { upstreamFor } from "./_upstream.js";
 
 const UPSTREAM_BASE = process.env.AXIOM_API_BASE ?? "https://axiom-api-eta.vercel.app/v1";
 
@@ -17,20 +22,23 @@ export default async function handler(req: any, res: any) {
   // function the original request URL, so tolerate the public /graph-viewer
   // prefix (the app is served under axiom.org/graph-viewer and calls
   // /graph-viewer/api/axiom/*, rewritten to this function by vercel.json).
-  const suffix = req.url.replace(/^(?:\/graph-viewer)?\/api\/axiom/, "");
-  const upstreamUrl = `${UPSTREAM_BASE.replace(/\/+$/, "")}${suffix}`;
+  const suffix = String(req.url ?? "").replace(/^(?:\/graph-viewer)?\/api\/axiom/, "");
+  const decision = upstreamFor(String(req.method ?? "GET").toUpperCase(), suffix);
+  if (!decision.ok) {
+    if (decision.status === 405) res.setHeader("allow", "GET, HEAD");
+    res.setHeader("cache-control", "no-store");
+    res.status(decision.status).json({ error: decision.error });
+    return;
+  }
+  const upstreamUrl = `${UPSTREAM_BASE.replace(/\/+$/, "")}${decision.path}`;
 
   const init: Record<string, unknown> = {
-    method: req.method,
+    method: req.method === "HEAD" ? "HEAD" : "GET",
     headers: {
       "x-api-key": apiKey,
       accept: "application/json",
     },
   };
-  if (req.method !== "GET" && req.method !== "HEAD") {
-    init.headers = { ...(init.headers as object), "content-type": "application/json" };
-    init.body = typeof req.body === "string" ? req.body : JSON.stringify(req.body ?? {});
-  }
 
   try {
     const upstream = await fetch(upstreamUrl, init);
