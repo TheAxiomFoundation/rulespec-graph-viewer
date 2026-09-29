@@ -9,6 +9,7 @@
   },
   "include": [
     "vite.config.ts",
+    "dev",
     "api/_upstream.ts"
   ]
 }
