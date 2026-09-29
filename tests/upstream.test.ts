@@ -57,6 +57,14 @@ describe("upstreamFor", () => {
     }
   });
 
+  it("drops any query string sent to the package routes", () => {
+    expect(upstreamFor("GET", "/runtime/packages?admin=1")).toEqual({ ok: true, path: "/runtime/packages" });
+    expect(upstreamFor("GET", "/runtime/packages/us-co/co-snap/graph?x=1&y=../admin")).toEqual({
+      ok: true,
+      path: "/runtime/packages/us-co/co-snap/graph",
+    });
+  });
+
   it("forwards only the focus parameter to compose", () => {
     expect(upstreamFor("GET", "/graph/compose?focus=us:statutes/26/24&v=2&admin=1")).toEqual({
       ok: true,
@@ -70,10 +78,15 @@ describe("upstreamFor", () => {
     // fragment in anywhere. Every accepted request must still be one of the
     // three shapes, resolve upstream to exactly that path, and never reach
     // anything else.
+    // mulberry32: 32-bit integer arithmetic throughout, so the sequence does
+    // not collapse into a short cycle the way a float LCG does.
     let state = 20260929;
     const random = () => {
-      state = (state * 1_103_515_245 + 12_345) >>> 0;
-      return state / 4_294_967_296;
+      state = (state + 0x6d2b79f5) >>> 0;
+      let t = state;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4_294_967_296;
     };
     const pick = <T,>(items: readonly T[]): T => items[Math.floor(random() * items.length)]!;
     const coordinates = [
@@ -86,10 +99,25 @@ describe("upstreamFor", () => {
       "us%3Astatutes%2F26%2F24", "x&admin=1",
     ];
     const fragments = ["/..", "/.", "/%2e%2e", "%2f", "/admin", "//", "\\", "?", "#", "/../admin/keys", "%5c"];
+    const word = (alphabet: string, min: number, max: number) => {
+      const length = min + Math.floor(random() * (max - min + 1));
+      let out = "";
+      for (let i = 0; i < length; i += 1) out += alphabet[Math.floor(random() * alphabet.length)];
+      return out;
+    };
+    // Fresh valid-looking values half the time, hostile ones otherwise.
+    const coordinate = () =>
+      random() < 0.5
+        ? word("abcdefghijklmnopqrstuvwxyz0123456789", 1, 1) + word("abcdefghijklmnopqrstuvwxyz0123456789-_", 0, 24)
+        : pick(coordinates);
+    const focus = () =>
+      random() < 0.5
+        ? `${word("abcdefghijklmnopqrstuvwxyz", 2, 2)}:${pick(["statutes", "regulations"])}/${word("0123456789", 1, 3)}/${word("0123456789abc", 1, 4)}${random() < 0.3 ? `%23${word("abcdefghijklmnopqrstuvwxyz_", 1, 12)}` : ""}`
+        : pick(focuses);
     const shapes = [
       () => "/runtime/packages",
-      () => `/runtime/packages/${pick(coordinates)}/${pick(coordinates)}/graph`,
-      () => `/graph/compose?focus=${pick(focuses)}`,
+      () => `/runtime/packages/${coordinate()}/${coordinate()}/graph`,
+      () => `/graph/compose?focus=${focus()}`,
     ];
     const allowed = [
       /^\/runtime\/packages$/,
@@ -97,6 +125,7 @@ describe("upstreamFor", () => {
       /^\/graph\/compose\?focus=[A-Za-z0-9%_.!~*'()-]+$/,
     ];
     let accepted = 0;
+    const distinct = new Set<string>();
     for (let run = 0; run < 20_000; run += 1) {
       let suffix = pick(shapes)();
       if (random() < 0.35) {
@@ -107,6 +136,7 @@ describe("upstreamFor", () => {
       const decision = upstreamFor(method, suffix);
       if (!decision.ok) continue;
       accepted += 1;
+      distinct.add(`${method} ${suffix}`);
       const context = `run=${run} method=${method} suffix=${JSON.stringify(suffix)} -> ${decision.path}`;
       expect(method, context).toBe("GET");
       expect(allowed.some((shape) => shape.test(decision.path)), context).toBe(true);
@@ -117,8 +147,9 @@ describe("upstreamFor", () => {
       expect(target.pathname, context).toBe(`/v1${decision.path.split("?")[0]}`);
       expect(/^\/v1\/(runtime\/packages(\/[^/]+\/[^/]+\/graph)?|graph\/compose)$/.test(target.pathname), context).toBe(true);
     }
-    // The property is only as good as the cases it accepts.
+    // The property is only as good as the distinct cases it accepts.
     expect(accepted).toBeGreaterThan(5_000);
+    expect(distinct.size).toBeGreaterThan(1_000);
   });
 });
 
