@@ -31,6 +31,11 @@ browser ──/api/axiom/*──▶ same-origin proxy ──x-api-key──▶ A
   (`405` for writes) without the key leaving the server. Both the Vercel
   function and the Vite proxy apply it: the proxy is public, and the key
   behind it must never be lent to other paths or methods.
+- The Vercel function sends upstream only its own `accept` and `x-api-key`
+  headers (no caller headers, body or extra query parameters) and never
+  follows an upstream redirect: fetch would carry the key along to wherever
+  the redirect points. A redirect or network failure gets a generic,
+  uncached `502`.
 - Program graphs come from `GET /v1/runtime/packages/{jurisdiction}/{program_id}/graph`.
   The viewer no longer builds graphs client-side.
 

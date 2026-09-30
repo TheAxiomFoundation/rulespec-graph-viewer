@@ -32,27 +32,44 @@ export default async function handler(req: any, res: any) {
   }
   const upstreamUrl = `${UPSTREAM_BASE.replace(/\/+$/, "")}${decision.path}`;
 
-  const init: Record<string, unknown> = {
+  // Built from scratch: nothing from the caller (headers, body, query string)
+  // rides along, only the validated path and our own two headers.
+  const init: RequestInit = {
     method: req.method === "HEAD" ? "HEAD" : "GET",
     headers: {
       "x-api-key": apiKey,
       accept: "application/json",
     },
+    // Never follow a redirect. fetch keeps custom headers such as x-api-key
+    // when it follows one, even to another origin, so a 3xx from upstream
+    // would carry the key to whatever URL it names, or spend it on a path the
+    // allowlist never approved. A redirect fails the request instead.
+    redirect: "error",
   };
 
+  let upstream: Response;
+  let body: string;
   try {
-    const upstream = await fetch(upstreamUrl, init);
-    const body = await upstream.text();
-    res.status(upstream.status);
-    res.setHeader("content-type", upstream.headers.get("content-type") ?? "application/json");
-    // Graphs and package lists are static per deploy; let the CDN cache them.
-    // Never cache errors — a cached 404 would outlive the upstream fix.
-    res.setHeader(
-      "cache-control",
-      upstream.ok ? "public, max-age=300, s-maxage=3600" : "no-store",
-    );
-    res.send(body);
+    upstream = await fetch(upstreamUrl, init);
+    body = await upstream.text();
   } catch (error) {
-    res.status(502).json({ error: `Upstream request failed: ${String(error)}` });
+    // A redirect, a network failure or a broken body. The error's cause can
+    // name upstream addresses ("connect ECONNREFUSED 10.0.0.1:443"), so it
+    // goes to the server log only; the caller gets a generic, uncached 502,
+    // and nothing is retried elsewhere.
+    console.error("Axiom API proxy: upstream request failed", error);
+    res.setHeader("cache-control", "no-store");
+    res.status(502).json({ error: "Upstream request failed." });
+    return;
   }
+
+  res.status(upstream.status);
+  res.setHeader("content-type", upstream.headers.get("content-type") ?? "application/json");
+  // Graphs and package lists are static per deploy; let the CDN cache them.
+  // Never cache errors — a cached 404 would outlive the upstream fix.
+  res.setHeader(
+    "cache-control",
+    upstream.ok ? "public, max-age=300, s-maxage=3600" : "no-store",
+  );
+  res.send(body);
 }

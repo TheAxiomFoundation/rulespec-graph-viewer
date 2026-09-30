@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import handler from "../api/axiom.js";
 import { upstreamFor } from "../api/_upstream.js";
+import { fakeResponse } from "./fake-response.js";
 
 describe("upstreamFor", () => {
   it("forwards the three reads the viewer makes", () => {
@@ -153,29 +154,254 @@ describe("upstreamFor", () => {
   });
 });
 
-function fakeResponse() {
-  const res = {
-    statusCode: 0,
-    headers: {} as Record<string, string>,
-    body: undefined as unknown,
-    status(code: number) {
-      res.statusCode = code;
-      return res;
-    },
-    setHeader(name: string, value: string) {
-      res.headers[name.toLowerCase()] = value;
-    },
-    json(value: unknown) {
-      res.body = value;
-      return res;
-    },
-    send(value: unknown) {
-      res.body = value;
-      return res;
-    },
-  };
-  return res;
+// The tables below pin each check in upstreamFor: loosening any one of them
+// (a regex anchor, a character class, a length cap, a segment comparison, the
+// focus rules) turns at least one row red. Every row runs through both the
+// allowlist and the deployed handler; a refused row must never reach fetch.
+
+const PRODUCTION_BASE = "https://axiom-api-eta.vercel.app/v1";
+const PREFIXES = ["/api/axiom", "/graph-viewer/api/axiom"] as const;
+
+/** Refused by the allowlist, and answered by the handler without a fetch. */
+async function expectRefused(suffix: string, method = "GET") {
+  const label = `${method} ${JSON.stringify(suffix)}`;
+  expect(upstreamFor(method, suffix), label).toMatchObject({
+    ok: false,
+    status: method === "GET" || method === "HEAD" ? 404 : 405,
+  });
+  vi.stubEnv("AXIOM_API_KEY", "server-secret");
+  const upstream = vi.fn();
+  vi.stubGlobal("fetch", upstream);
+  for (const prefix of PREFIXES) {
+    const res = fakeResponse();
+    await handler({ method, url: `${prefix}${suffix}`, headers: {} }, res);
+    expect(res.statusCode, `${label} via ${prefix}`).toBe(method === "GET" || method === "HEAD" ? 404 : 405);
+    expect(res.headers["cache-control"], label).toBe("no-store");
+  }
+  expect(upstream, label).not.toHaveBeenCalled();
 }
+
+/** Forwarded as exactly `path`, by the allowlist and by the handler. */
+async function expectForwarded(suffix: string, path: string, method = "GET") {
+  const label = `${method} ${JSON.stringify(suffix)}`;
+  expect(upstreamFor(method, suffix), label).toEqual({ ok: true, path });
+  vi.stubEnv("AXIOM_API_KEY", "server-secret");
+  const upstream = vi.fn(async (_url: string, _init: RequestInit) => new Response("{}", { status: 200 }));
+  vi.stubGlobal("fetch", upstream);
+  for (const prefix of PREFIXES) {
+    upstream.mockClear();
+    await handler({ method, url: `${prefix}${suffix}`, headers: {} }, fakeResponse());
+    expect(upstream, `${label} via ${prefix}`).toHaveBeenCalledOnce();
+    expect(upstream.mock.calls[0]![0], `${label} via ${prefix}`).toBe(`${PRODUCTION_BASE}${path}`);
+  }
+}
+
+const GRAPH = (jurisdiction: string, program: string) => `/runtime/packages/${jurisdiction}/${program}/graph`;
+
+describe("allowlist tables", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  it("accepts package coordinates at the edges of the allowed alphabet and length", async () => {
+    for (const coordinate of ["a", "0", "us_ny", "a-", "a_", "canada-workers-benefit", "a".repeat(64)]) {
+      await expectForwarded(GRAPH(coordinate, "co-snap"), GRAPH(coordinate, "co-snap"));
+      await expectForwarded(GRAPH("us-co", coordinate), GRAPH("us-co", coordinate));
+    }
+  });
+
+  it("refuses hostile package coordinates in either position", async () => {
+    const hostile = [
+      // Empty, or too long by one.
+      "",
+      "a".repeat(65),
+      "a".repeat(200),
+      // Must start with a lowercase letter or digit.
+      "-rf",
+      "_x",
+      // Uppercase anywhere.
+      "US-CO",
+      "us-CO",
+      "Us",
+      // Percent-encoding of any kind.
+      "%41",
+      "us-co%41",
+      "us%2dco",
+      "us-co%00",
+      "us-co%0a",
+      // Dots inside a segment.
+      "us.co",
+      "co-snap.json",
+      "a..b",
+      ".hidden",
+      // Junk after a valid prefix: the URL parser leaves these characters
+      // alone, so only the pattern's end anchor refuses them.
+      "us-co~",
+      "us-co!",
+      "us-co:1",
+      "us-co@x",
+      "us-co+x",
+      "us-co;x",
+      "us-co,x",
+      "us-co=x",
+      "us-co$",
+      "us-co'",
+      "us-co*",
+      "us-co(x)",
+      "us-co|x",
+      // Whitespace and controls: the URL parser strips or encodes these, so
+      // the raw-path check refuses them before the pattern sees them.
+      "us-co\n",
+      "us-co\r\n",
+      "us-co\t",
+      "us-co ",
+      "us-co^",
+      "ｕｓ",
+    ];
+    for (const coordinate of hostile) {
+      await expectRefused(GRAPH(coordinate, "co-snap"));
+      await expectRefused(GRAPH("us-co", coordinate));
+    }
+  });
+
+  it("refuses every route that differs from an allowed shape by one segment", async () => {
+    const literals = ["runtime", "packages", "graph", "compose"];
+    const shapes: { segments: string[]; query: string; literal: boolean[] }[] = [
+      { segments: ["runtime", "packages"], query: "", literal: [true, true] },
+      {
+        segments: ["runtime", "packages", "us-co", "co-snap", "graph"],
+        query: "",
+        literal: [true, true, false, false, true],
+      },
+      { segments: ["graph", "compose"], query: "?focus=us:statutes/26/24", literal: [true, true] },
+    ];
+    const variants = new Set<string>();
+    for (const { segments, query, literal } of shapes) {
+      const build = (parts: string[]) => `/${parts.join("/")}${query}`;
+      segments.forEach((segment, i) => {
+        // Drop the segment.
+        variants.add(build(segments.filter((_, j) => j !== i)));
+        // Replace a fixed segment with a near miss or another route's word.
+        if (literal[i]) {
+          for (const other of ["x", segment.toUpperCase(), `${segment}s`, `${segment}x`, ...literals]) {
+            if (other !== segment) variants.add(build(segments.map((s, j) => (j === i ? other : s))));
+          }
+        }
+      });
+      // Insert an extra segment anywhere, and add a trailing slash.
+      for (let i = 0; i <= segments.length; i += 1) {
+        for (const extra of ["x", "graph", "v1", "admin"]) {
+          variants.add(build([...segments.slice(0, i), extra, ...segments.slice(i)]));
+        }
+      }
+      variants.add(`/${segments.join("/")}/${query}`);
+    }
+    // Cross-shape splices.
+    for (const suffix of [
+      "/runtime/compose?focus=x",
+      "/graph/packages",
+      "/packages/runtime",
+      "/compose/graph?focus=x",
+      "/runtime/packages/us-co/co-snap/compose?focus=x",
+      "/graph/compose/us-co/co-snap/graph?focus=x",
+      "/runtime/packages/us-co/graph",
+      "/runtime/packages/graph",
+    ]) {
+      variants.add(suffix);
+    }
+    expect(variants.size).toBeGreaterThan(80);
+    for (const suffix of variants) await expectRefused(suffix);
+  });
+
+  it("matches the whole path, not a tail after junk", async () => {
+    // Via the handler, "x/runtime/packages" is /api/axiomx/runtime/packages.
+    // The URL parser drops or rewrites what comes before the first slash, so
+    // only the raw-path comparison refuses these.
+    for (const suffix of [
+      "x/runtime/packages",
+      "s/runtime/packages/us-co/co-snap/graph",
+      "x/graph/compose?focus=us:statutes/26/24",
+      " /runtime/packages",
+      "\t/runtime/packages",
+      "\\x/runtime/packages",
+      "runtime/packages",
+    ]) {
+      await expectRefused(suffix);
+    }
+  });
+
+  it("drops every query parameter the route does not take", async () => {
+    await expectForwarded("/runtime/packages?admin=1&x-api-key=caller", "/runtime/packages");
+    await expectForwarded("/runtime/packages?focus=us:statutes/26/24", "/runtime/packages");
+    await expectForwarded("/runtime/packages#admin", "/runtime/packages");
+    await expectForwarded(`${GRAPH("us-co", "co-snap")}?path=/admin/keys&y=..%2Fadmin`, GRAPH("us-co", "co-snap"));
+    await expectForwarded(
+      "/graph/compose?admin=1&focus=us:statutes/26/24&path=/admin/keys&v=2",
+      "/graph/compose?focus=us%3Astatutes%2F26%2F24",
+    );
+    // An encoded & inside the focus stays inside the one parameter.
+    await expectForwarded("/graph/compose?focus=a%26focus%3Db", "/graph/compose?focus=a%26focus%3Db");
+  });
+
+  it("uses only the first focus, and never goes looking for a better one", async () => {
+    await expectForwarded(
+      "/graph/compose?focus=us:statutes/26/24&focus=../../admin/keys",
+      "/graph/compose?focus=us%3Astatutes%2F26%2F24",
+    );
+    await expectForwarded("/graph/compose?focus=a&focus=b", "/graph/compose?focus=a");
+    await expectRefused("/graph/compose?focus=../../admin/keys&focus=us:statutes/26/24");
+    await expectRefused("/graph/compose?focus=&focus=us:statutes/26/24");
+    await expectRefused("/graph/compose?focuses=us:statutes/26/24");
+    await expectRefused("/graph/compose?Focus=us:statutes/26/24");
+  });
+
+  it("refuses dot segments in the focus, however they are separated or encoded", async () => {
+    // Decoded focus values. Each is sent fully percent-encoded, and as typed
+    // with only "#" escaped (a bare "#" would end the query string).
+    const hostile = [
+      ".",
+      "..",
+      "./x",
+      "../x",
+      "x/.",
+      "x/..",
+      "x/./y",
+      "x/../y",
+      "x#.",
+      "x#..",
+      "#..",
+      "#.",
+      "x/y#../z",
+      "us:statutes/26/24#..",
+      "us:statutes/26/24#./x",
+    ];
+    for (const focus of hostile) {
+      await expectRefused(`/graph/compose?focus=${encodeURIComponent(focus)}`);
+      await expectRefused(`/graph/compose?focus=${focus.replace(/#/g, "%23")}`);
+    }
+    for (const encoded of ["x%2F..%2Fy", "%2E%2E", "%2e", "x/%2e%2e/y", "x%2F.", "x%23%2E%2E"]) {
+      await expectRefused(`/graph/compose?focus=${encoded}`);
+    }
+    // Dots inside a segment are ordinary legal-id text.
+    await expectForwarded("/graph/compose?focus=us:statutes/26/24.1", "/graph/compose?focus=us%3Astatutes%2F26%2F24.1");
+    await expectForwarded("/graph/compose?focus=a..b/c", "/graph/compose?focus=a..b%2Fc");
+  });
+
+  it("refuses an empty, over-long or whitespace focus", async () => {
+    const hostile = ["", "a%20b", "a+b", "a%09b", "a%0Ab", "a%0Db", "a%0Cb", "a%C2%A0b", "a%E2%80%A8b", "x".repeat(513)];
+    for (const focus of hostile) await expectRefused(`/graph/compose?focus=${focus}`);
+    await expectForwarded(`/graph/compose?focus=${"x".repeat(512)}`, `/graph/compose?focus=${"x".repeat(512)}`);
+  });
+
+  it("refuses writes on every allowed route", async () => {
+    for (const method of ["POST", "PUT", "PATCH", "DELETE", "OPTIONS", "TRACE", "CONNECT"]) {
+      for (const suffix of ["/runtime/packages", GRAPH("us-co", "co-snap"), "/graph/compose?focus=us:statutes/26/24"]) {
+        await expectRefused(suffix, method);
+      }
+    }
+  });
+});
 
 describe("proxy handler", () => {
   afterEach(() => {
