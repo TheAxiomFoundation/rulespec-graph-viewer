@@ -21,8 +21,21 @@ browser ──/api/axiom/*──▶ same-origin proxy ──x-api-key──▶ A
 - The browser only ever makes **same-origin** requests to `/api/axiom/*`. A
   proxy forwards them to the Axiom API and injects the API key server-side, so
   the key never reaches the browser bundle and there is no CORS dependency.
-  - Local dev: the Vite dev-server proxy (`vite.config.ts`).
-  - Production: a Vercel function (`api/axiom/[...path].ts`).
+  - Local dev and `pnpm preview`: the Vite proxy (`vite.config.ts`), behind
+    the same allowlist (`dev/proxy-guard.ts`).
+  - Production: a Vercel function (`api/axiom.ts`).
+- The proxy forwards **only the reads the viewer makes**: `GET`/`HEAD` of
+  `runtime/packages`, `runtime/packages/{jurisdiction}/{program_id}/graph`,
+  and `graph/compose?focus=…`. `api/_upstream.ts` validates each part and
+  builds the upstream URL from the validated parts; anything else gets `404`
+  (`405` for writes) without the key leaving the server. Both the Vercel
+  function and the Vite proxy apply it: the proxy is public, and the key
+  behind it must never be lent to other paths or methods.
+- The Vercel function sends upstream only its own `accept` and `x-api-key`
+  headers (no caller headers, body or extra query parameters) and never
+  follows an upstream redirect: fetch would carry the key along to wherever
+  the redirect points. A redirect or network failure gets a generic,
+  uncached `502`.
 - Program graphs come from `GET /v1/runtime/packages/{jurisdiction}/{program_id}/graph`.
   The viewer no longer builds graphs client-side.
 
@@ -45,8 +58,12 @@ Environment variables (see `.env.example`):
 ## Deployment (Vercel)
 
 Set `AXIOM_API_KEY` (and optionally `AXIOM_API_BASE`) as a project environment
-variable. The `api/axiom/[...path].ts` function reads it at request time. The
-graph endpoint must be available on the deployed Axiom API.
+variable. The `api/axiom.ts` function reads it at request time. The graph
+endpoint must be available on the deployed Axiom API.
+
+The Vercel project is not connected to Git: production deploys are made from
+the CLI (`vercel --prod` from a clean checkout of `main`), so a merge alone
+does not ship.
 
 ## Relationship to axiom.org
 
