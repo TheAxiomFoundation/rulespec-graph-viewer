@@ -52,7 +52,7 @@ Environment variables (see `.env.example`):
 - `AXIOM_API_KEY` (required) — used by the proxy to authenticate to the Axiom
   API. Never exposed to the browser.
 - `AXIOM_API_BASE` (optional) — override the upstream Axiom API base. Defaults
-  to `https://axiom-api-eta.vercel.app/v1`. Point it at a local API instance
+  to `https://api.axiom.org/v1`. Point it at a local API instance
   (e.g. `http://localhost:8799/v1`) when testing unreleased endpoints.
 
 ## Deployment (Vercel)

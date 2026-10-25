@@ -8,6 +8,13 @@
 // the raw request path, so encoded dot segments, extra slashes and stray
 // query parameters cannot steer it elsewhere.
 
+// The Axiom API this viewer reads, when AXIOM_API_BASE does not say
+// otherwise. Canonical host: api.axiom.org is an alias the API owns, so a
+// project rename on the hosting side cannot break every consumer's config
+// the way the old axiom-api-eta.vercel.app name could. One constant for the
+// Vercel function and the dev proxy, so the two can never drift.
+export const DEFAULT_UPSTREAM_BASE = "https://api.axiom.org/v1";
+
 export type UpstreamDecision =
   | { ok: true; path: string }
   | { ok: false; status: 404 | 405; error: string };
