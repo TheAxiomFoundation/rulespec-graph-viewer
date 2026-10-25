@@ -7,9 +7,9 @@
 // Only the reads the viewer makes are forwarded (see ./_upstream.ts); the key
 // behind this proxy must never be lent to arbitrary paths or methods.
 
-import { upstreamFor } from "./_upstream.js";
+import { DEFAULT_UPSTREAM_BASE, upstreamFor } from "./_upstream.js";
 
-const UPSTREAM_BASE = process.env.AXIOM_API_BASE ?? "https://axiom-api-eta.vercel.app/v1";
+const UPSTREAM_BASE = process.env.AXIOM_API_BASE ?? DEFAULT_UPSTREAM_BASE;
 
 export default async function handler(req: any, res: any) {
   const apiKey = process.env.AXIOM_API_KEY;

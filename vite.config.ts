@@ -1,5 +1,6 @@
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
+import { DEFAULT_UPSTREAM_BASE } from "./api/_upstream.js";
 import { PROXY_PREFIX, proxyAllowlist } from "./dev/proxy-guard";
 
 // The viewer talks to the Axiom API only through a same-origin proxy so the
@@ -14,7 +15,7 @@ import { PROXY_PREFIX, proxyAllowlist } from "./dev/proxy-guard";
 // /graph-viewer/ base.
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
-  const upstream = env.AXIOM_API_BASE ?? "https://axiom-api-eta.vercel.app/v1";
+  const upstream = env.AXIOM_API_BASE ?? DEFAULT_UPSTREAM_BASE;
   const apiKey = env.AXIOM_API_KEY ?? "";
   return {
     base: "/graph-viewer/",

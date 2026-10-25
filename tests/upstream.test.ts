@@ -159,7 +159,7 @@ describe("upstreamFor", () => {
 // focus rules) turns at least one row red. Every row runs through both the
 // allowlist and the deployed handler; a refused row must never reach fetch.
 
-const PRODUCTION_BASE = "https://axiom-api-eta.vercel.app/v1";
+const PRODUCTION_BASE = "https://api.axiom.org/v1";
 const PREFIXES = ["/api/axiom", "/graph-viewer/api/axiom"] as const;
 
 /** Refused by the allowlist, and answered by the handler without a fetch. */
@@ -439,7 +439,7 @@ describe("proxy handler", () => {
     await handler({ method: "GET", url: "/graph-viewer/api/axiom/runtime/packages" }, res);
     expect(res.statusCode).toBe(200);
     expect(upstream).toHaveBeenCalledWith(
-      "https://axiom-api-eta.vercel.app/v1/runtime/packages",
+      "https://api.axiom.org/v1/runtime/packages",
       expect.objectContaining({ method: "GET", headers: expect.objectContaining({ "x-api-key": "server-secret" }) }),
     );
     expect(res.headers["cache-control"]).toBe("public, max-age=300, s-maxage=3600");
